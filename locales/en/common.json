@@ -99,6 +99,9 @@
     "analysisStuck": "Analysis appears to be stuck. This may be due to API issues. Please try again.",
     "analysisFailed": "Analysis failed after {attempts} attempts. Please try again. Error: {error}",
     "networkError": "Network error, retrying... ({current}/{total})",
+    "analysisIncomplete": "Analysis Incomplete",
+    "retryAnalysis": "Retry Analysis",
+    "continueWithCurrent": "Continue with Current Results",
     "setupInstructions": {
       "title": "To fix this:",
       "getApiKey": "Get your API key from Upstage.ai",

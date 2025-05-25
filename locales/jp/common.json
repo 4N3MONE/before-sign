@@ -99,6 +99,9 @@
     "analysisStuck": "分析が停止しているようです。APIの問題の可能性があります。もう一度お試しください。",
     "analysisFailed": "{attempts}回の試行後、分析に失敗しました。もう一度お試しください。エラー: {error}",
     "networkError": "ネットワークエラー、再試行中... ({current}/{total})",
+    "analysisIncomplete": "分析未完了",
+    "retryAnalysis": "分析を再試行",
+    "continueWithCurrent": "現在の結果で続行",
     "setupInstructions": {
       "title": "修正方法:",
       "getApiKey": "Upstage.aiからAPIキーを取得してください",

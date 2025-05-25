@@ -126,6 +126,12 @@ export default function BeforeSignApp() {
   const [configError, setConfigError] = useState<string | null>(null)
   const [retryStatus, setRetryStatus] = useState<string | null>(null)
   const [stuckTimeout, setStuckTimeout] = useState<NodeJS.Timeout | null>(null)
+  const [analysisError, setAnalysisError] = useState<{
+    type: 'category' | 'deep',
+    message: string,
+    canRetry: boolean,
+    retryData?: any
+  } | null>(null)
 
   const createDiffText = (originalText: string, suggestedText: string): string => {
     if (!originalText || !suggestedText) return ""
@@ -408,7 +414,7 @@ export default function BeforeSignApp() {
          return getNextCategoryRisks(contractText, existingRisks, categoryIndex, retryCount + 1)
        }
       
-             // Final failure - stop the process and show error
+             // Final failure - stop the process and show retry option
        setIsGettingRemainingRisks(false)
        setCategoryProgress({ current: 0, total: 5, currentCategory: "" })
        
@@ -418,11 +424,17 @@ export default function BeforeSignApp() {
          setStuckTimeout(null)
        }
        
-       // Check if it's an API key error
+       // Check if it's an API key error (don't offer retry for config issues)
       if (error instanceof Error && (error.message.includes('UPSTAGE_API_KEY') || error.message.includes('API key'))) {
         setConfigError('API configuration error. Please check your UPSTAGE_API_KEY.')
       } else {
-        setConfigError(`Analysis failed after ${maxRetries + 1} attempts. Please try again. Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        // Set analysis error with retry option instead of config error
+        setAnalysisError({
+          type: 'category',
+          message: `Failed to complete risk identification after ${maxRetries + 1} attempts. You can retry the analysis or continue with the ${existingRisks.length} risks already found.`,
+          canRetry: true,
+          retryData: { contractText, existingRisks, categoryIndex }
+        })
       }
     }
   }
@@ -772,6 +784,38 @@ export default function BeforeSignApp() {
     }
   }
 
+  const retryFailedAnalysis = () => {
+    if (!analysisError || !analysisError.canRetry) return
+    
+    setAnalysisError(null)
+    
+    if (analysisError.type === 'category' && analysisError.retryData) {
+      // Retry category analysis
+      const { contractText, existingRisks, categoryIndex } = analysisError.retryData
+      setIsGettingRemainingRisks(true)
+      setCategoryProgress({ current: categoryIndex, total: 5, currentCategory: "Retrying..." })
+      getNextCategoryRisks(contractText, existingRisks, categoryIndex)
+    } else if (analysisError.type === 'deep' && analysisResult) {
+      // Retry deep analysis for incomplete risks
+      const incompleteRisks = analysisResult.risks.filter(risk => !risk.analysisComplete)
+      if (incompleteRisks.length > 0) {
+        performDeepAnalysis(incompleteRisks)
+      }
+    }
+  }
+
+  const continueWithCurrentResults = () => {
+    setAnalysisError(null)
+    
+    if (analysisResult && analysisResult.risks.length > 0) {
+      // Start deep analysis for current risks if not already complete
+      const incompleteRisks = analysisResult.risks.filter(risk => !risk.analysisComplete)
+      if (incompleteRisks.length > 0) {
+        performDeepAnalysis(incompleteRisks)
+      }
+    }
+  }
+
   const resetApp = () => {
     setCurrentStep("upload")
     setUploadedFile(null)
@@ -787,6 +831,7 @@ export default function BeforeSignApp() {
     setIsGettingRemainingRisks(false)
     setConfigError(null)
     setRetryStatus(null)
+    setAnalysisError(null)
     // Clear any stuck timeout
     if (stuckTimeout) {
       clearTimeout(stuckTimeout)
@@ -890,6 +935,14 @@ export default function BeforeSignApp() {
                   <p className="text-sm text-gray-500">{t('features.recommendations.description')}</p>
                 </div>
               </div>
+
+              {/* Important Disclaimer */}
+              <Alert className="mt-8 border-amber-200 bg-amber-50">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800">
+                  <strong>{t('disclaimer.title')}</strong> {t('disclaimer.text')}
+                </AlertDescription>
+              </Alert>
             </CardContent>
           </Card>
         </div>
@@ -1128,6 +1181,40 @@ export default function BeforeSignApp() {
                   )}
                 </AlertDescription>
               </div>
+            </Alert>
+          )}
+
+          {/* Analysis Error with Retry Options */}
+          {analysisError && (
+            <Alert className="mb-6 bg-orange-50 border-orange-200">
+              <AlertTriangle className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-orange-800">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <strong>{t('errors.analysisIncomplete')}</strong>
+                    <p className="text-sm mt-1">{analysisError.message}</p>
+                  </div>
+                  <div className="flex gap-2 ml-4">
+                    {analysisError.canRetry && (
+                      <Button 
+                        size="sm"
+                        onClick={retryFailedAnalysis}
+                        className="bg-orange-100 border-orange-300 text-orange-700 hover:bg-orange-200"
+                      >
+                        {t('errors.retryAnalysis')}
+                      </Button>
+                    )}
+                    <Button 
+                      size="sm"
+                      variant="outline"
+                      onClick={continueWithCurrentResults}
+                      className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                    >
+                      {t('errors.continueWithCurrent')}
+                    </Button>
+                  </div>
+                </div>
+              </AlertDescription>
             </Alert>
           )}
 
