@@ -113,6 +113,9 @@ export default function BeforeSignApp() {
     identifyTime: 0,
     deepAnalysisTime: 0
   })
+  const [configError, setConfigError] = useState<string | null>(null)
+  const [retryStatus, setRetryStatus] = useState<string | null>(null)
+  const [stuckTimeout, setStuckTimeout] = useState<NodeJS.Timeout | null>(null)
 
   const createDiffText = (originalText: string, suggestedText: string): string => {
     if (!originalText || !suggestedText) return ""
@@ -215,8 +218,16 @@ export default function BeforeSignApp() {
     })
   }, [])
 
-  const getNextCategoryRisks = async (contractText: string, existingRisks: Risk[], categoryIndex: number = 0) => {
+  const getNextCategoryRisks = async (contractText: string, existingRisks: Risk[], categoryIndex: number = 0, retryCount: number = 0) => {
+    const maxRetries = 3
+    
     try {
+      console.log(`Getting category risks for index ${categoryIndex}, attempt ${retryCount + 1}/${maxRetries + 1}`)
+      
+      // Add timeout to the fetch request
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 120000) // 2 minute timeout
+      
       const response = await fetch('/api/remaining-risks', {
         method: 'POST',
         headers: {
@@ -227,10 +238,19 @@ export default function BeforeSignApp() {
           existingRisks: existingRisks,
           categoryIndex: categoryIndex
         }),
+        signal: controller.signal
       })
+
+      clearTimeout(timeoutId)
 
       if (response.ok) {
         const categoryRisks = await response.json()
+        console.log(`Got category risks response:`, {
+          categoryAnalyzed: categoryRisks.categoryAnalyzed,
+          risksFound: categoryRisks.risks?.length || 0,
+          hasMoreCategories: categoryRisks.hasMoreCategories,
+          nextCategoryIndex: categoryRisks.nextCategoryIndex
+        })
         
         // Update LLM stats
         if (categoryRisks.llmStats) {
@@ -248,6 +268,14 @@ export default function BeforeSignApp() {
             current: categoryIndex + 1,
             total: 5,
             currentCategory: categoryRisks.categoryAnalyzed
+          })
+          console.log(`Updated category progress: ${categoryIndex + 1}/5 - ${categoryRisks.categoryAnalyzed}`)
+        } else {
+          console.warn(`No categoryAnalyzed in response:`, categoryRisks)
+          setCategoryProgress({
+            current: categoryIndex + 1,
+            total: 5,
+            currentCategory: `Category ${categoryIndex + 1}`
           })
         }
         
@@ -295,8 +323,10 @@ export default function BeforeSignApp() {
         if (categoryRisks.hasMoreCategories) {
           // Continue with next category
           console.log(`Continuing with next category (${categoryRisks.nextCategoryIndex})...`)
-          getNextCategoryRisks(contractText, allRisks, categoryRisks.nextCategoryIndex)
+          console.log(`Current allRisks count: ${allRisks.length}`)
+          await getNextCategoryRisks(contractText, allRisks, categoryRisks.nextCategoryIndex)
         } else {
+          console.log('All categories completed! Finalizing risk identification...')
           // All categories done - update summary and start deep analysis
           setAnalysisResult(prev => {
             if (!prev) return prev
@@ -308,6 +338,12 @@ export default function BeforeSignApp() {
           
           setIsGettingRemainingRisks(false)
           setCategoryProgress({ current: 0, total: 5, currentCategory: "" })
+          
+          // Clear the stuck timeout since we completed successfully
+          if (stuckTimeout) {
+            clearTimeout(stuckTimeout)
+            setStuckTimeout(null)
+          }
           
           // NOW start deep analysis for ALL risks since risk identification is complete
           console.log('All risk identification complete. Starting deep analysis for', allRisks.length, 'risks...')
@@ -326,10 +362,58 @@ export default function BeforeSignApp() {
             return prev
           })
         }
+      } else {
+        // Handle non-OK responses
+        const errorText = await response.text()
+        console.error(`API /remaining-risks failed with status ${response.status}:`, errorText)
+        
+        // Check if it's an API key error
+        if (response.status === 401 || errorText.includes('UPSTAGE_API_KEY')) {
+          setConfigError('API configuration error. Please check your UPSTAGE_API_KEY.')
+          setIsGettingRemainingRisks(false)
+          setCategoryProgress({ current: 0, total: 5, currentCategory: "" })
+          return
+        }
+        
+        // Retry for other errors
+        if (retryCount < maxRetries) {
+          console.log(`Retrying category risks in 2 seconds... (${retryCount + 1}/${maxRetries})`)
+          setRetryStatus(`Retrying... (${retryCount + 1}/${maxRetries})`)
+          await new Promise(resolve => setTimeout(resolve, 2000))
+          setRetryStatus(null)
+          return getNextCategoryRisks(contractText, existingRisks, categoryIndex, retryCount + 1)
+        } else {
+          throw new Error(`API failed after ${maxRetries + 1} attempts: ${response.status} ${errorText}`)
+        }
       }
     } catch (error) {
       console.error('Failed to get category risks:', error)
-      setIsGettingRemainingRisks(false)
+      
+             // Check if it's a timeout or network error that we should retry
+       if (retryCount < maxRetries && (error instanceof Error && (error.name === 'AbortError' || error.message.includes('fetch')))) {
+         console.log(`Network error, retrying in 3 seconds... (${retryCount + 1}/${maxRetries})`)
+         setRetryStatus(`Network error, retrying... (${retryCount + 1}/${maxRetries})`)
+         await new Promise(resolve => setTimeout(resolve, 3000))
+         setRetryStatus(null)
+         return getNextCategoryRisks(contractText, existingRisks, categoryIndex, retryCount + 1)
+       }
+      
+             // Final failure - stop the process and show error
+       setIsGettingRemainingRisks(false)
+       setCategoryProgress({ current: 0, total: 5, currentCategory: "" })
+       
+       // Clear stuck timeout
+       if (stuckTimeout) {
+         clearTimeout(stuckTimeout)
+         setStuckTimeout(null)
+       }
+       
+       // Check if it's an API key error
+      if (error instanceof Error && (error.message.includes('UPSTAGE_API_KEY') || error.message.includes('API key'))) {
+        setConfigError('API configuration error. Please check your UPSTAGE_API_KEY.')
+      } else {
+        setConfigError(`Analysis failed after ${maxRetries + 1} attempts. Please try again. Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      }
     }
   }
 
@@ -354,6 +438,10 @@ export default function BeforeSignApp() {
       updateRiskAnalysis(risk.id, { isAnalyzing: true })
 
       try {
+        // Add timeout to the fetch request
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 180000) // 3 minute timeout for deep analysis
+        
         const response = await fetch('/api/deep-analysis', {
           method: 'POST',
           headers: {
@@ -365,7 +453,10 @@ export default function BeforeSignApp() {
             description: risk.description,
             originalText: risk.originalText
           }),
+          signal: controller.signal
         })
+
+        clearTimeout(timeoutId)
 
         if (response.ok) {
           const deepAnalysis = await response.json()
@@ -401,6 +492,11 @@ export default function BeforeSignApp() {
           const errorText = await response.text()
           console.error('Error details:', errorText)
           
+          // Check if it's an API key error
+          if (errorText.includes('UPSTAGE_API_KEY') || response.status === 401) {
+            setConfigError('API configuration error. Please check your UPSTAGE_API_KEY.')
+          }
+          
           // Mark as complete even if analysis failed
           updateRiskAnalysis(risk.id, { 
             description: "Analysis failed - please review manually",
@@ -416,13 +512,27 @@ export default function BeforeSignApp() {
         }
       } catch (error) {
         console.error('Deep analysis failed for risk:', risk.id, error)
+        
+        // Check if it's an API key error
+        if (error instanceof Error && (error.message.includes('UPSTAGE_API_KEY') || error.message.includes('API key'))) {
+          setConfigError('API configuration error during deep analysis. Please check your UPSTAGE_API_KEY.')
+        }
+        
+        // Check if it's a timeout error
+        const isTimeout = error instanceof Error && error.name === 'AbortError'
+        const errorMessage = isTimeout 
+          ? "Analysis timed out - please review manually" 
+          : "Network error during analysis - please review manually"
+        
         updateRiskAnalysis(risk.id, { 
-          description: "Network error during analysis - please review manually",
+          description: errorMessage,
           isAnalyzing: false, 
           analysisComplete: true,
-          businessImpact: "Network error during analysis - please review manually",
+          businessImpact: errorMessage,
           recommendations: [{
-            action: "Review this risk manually with legal counsel",
+            action: isTimeout 
+              ? "This analysis timed out. Try again or review manually with legal counsel"
+              : "Review this risk manually with legal counsel",
             priority: "medium" as const,
             effort: "medium" as const
           }],
@@ -549,8 +659,33 @@ export default function BeforeSignApp() {
       if (firstCategoryRisks.hasMoreCategories) {
         setIsGettingRemainingRisks(true)
         setCategoryProgress({ current: 1, total: 5, currentCategory: "Starting..." })
+        
+        // Set up a timeout to detect if analysis gets stuck
+        const timeout = setTimeout(() => {
+          console.error('Category analysis appears stuck, showing error...')
+          setConfigError('Analysis appears to be stuck. This may be due to API issues. Please try again.')
+          setIsGettingRemainingRisks(false)
+          setCategoryProgress({ current: 0, total: 5, currentCategory: "" })
+        }, 300000) // 5 minute timeout
+        
+        setStuckTimeout(timeout)
+        
         // Start with categoryIndex 0 for remaining categories (TERMINATION, PAYMENT, etc.)
         getNextCategoryRisks(uploadResult.parsedContent.text, firstCategoryRisks.risks, 0)
+          .then(() => {
+            // Clear timeout when done
+            if (stuckTimeout) {
+              clearTimeout(stuckTimeout)
+              setStuckTimeout(null)
+            }
+          })
+          .catch((error) => {
+            console.error('Category analysis failed:', error)
+            if (stuckTimeout) {
+              clearTimeout(stuckTimeout)
+              setStuckTimeout(null)
+            }
+          })
       } else {
         // If no more categories, start deep analysis immediately
         console.log('No more categories, starting deep analysis immediately for', firstCategoryRisks.risks.length, 'risks')
@@ -561,7 +696,15 @@ export default function BeforeSignApp() {
       console.error('Error:', error)
       setIsUploading(false)
       setCurrentStep("upload")
-      // You might want to show an error message to the user here
+      
+      // Check if it's an API key configuration error
+      if (error instanceof Error && error.message.includes('UPSTAGE_API_KEY')) {
+        setConfigError('API configuration missing. Please set up the UPSTAGE_API_KEY environment variable.')
+      } else if (error instanceof Error && error.message.includes('API key')) {
+        setConfigError('API key error. Please check your UPSTAGE_API_KEY configuration.')
+      } else {
+        setConfigError('An error occurred while processing your document. Please try again.')
+      }
     }
   }
 
@@ -632,6 +775,13 @@ export default function BeforeSignApp() {
     setIsGettingAdditionalRisks(false)
     setCurrentProgress("")
     setIsGettingRemainingRisks(false)
+    setConfigError(null)
+    setRetryStatus(null)
+    // Clear any stuck timeout
+    if (stuckTimeout) {
+      clearTimeout(stuckTimeout)
+      setStuckTimeout(null)
+    }
     setLlmStats({
       totalCalls: 0,
       totalTime: 0,
@@ -667,7 +817,18 @@ export default function BeforeSignApp() {
                 <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Drop your file here, or click to browse</h3>
                 <p className="text-gray-500 mb-4">Supports PDF, DOC, DOCX files up to 10MB</p>
-                <Button disabled={isUploading}>{isUploading ? 'Uploading...' : 'Choose File'}</Button>
+                <div className="flex gap-2 justify-center">
+                  <Button disabled={isUploading}>{isUploading ? 'Uploading...' : 'Choose File'}</Button>
+                  {configError && (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setConfigError(null)}
+                      className="text-red-600 border-red-200 hover:bg-red-50"
+                    >
+                      Clear Error
+                    </Button>
+                  )}
+                </div>
                 <input
                   id="file-input"
                   type="file"
@@ -677,6 +838,25 @@ export default function BeforeSignApp() {
                   disabled={isUploading}
                 />
               </div>
+
+              {configError && (
+                <Alert className="mt-6 bg-red-50 border-red-200">
+                  <AlertTriangle className="h-4 w-4 text-red-600" />
+                  <AlertDescription className="text-red-800">
+                    <strong>Configuration Error:</strong> {configError}
+                    {configError.includes('UPSTAGE_API_KEY') && (
+                      <div className="mt-2 text-sm">
+                        <p>To fix this:</p>
+                        <ol className="list-decimal list-inside mt-1 space-y-1">
+                          <li>Get your API key from <a href="https://www.upstage.ai/" target="_blank" rel="noopener noreferrer" className="underline text-red-700">Upstage.ai</a></li>
+                          <li>Set the environment variable: <code className="bg-red-100 px-1 rounded">UPSTAGE_API_KEY=your_key_here</code></li>
+                          <li>Restart the application</li>
+                        </ol>
+                      </div>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="text-center p-4">
@@ -882,7 +1062,13 @@ export default function BeforeSignApp() {
                     </div>
                   </div>
                   <div className="text-sm mt-1">
-                    {categoryProgress.currentCategory ? (
+                    {retryStatus ? (
+                      <>
+                        <span className="text-yellow-600 font-medium">{retryStatus}</span>
+                        <br />
+                        Connection issues detected, retrying...
+                      </>
+                    ) : categoryProgress.currentCategory ? (
                       <>
                         Currently analyzing: <strong>{categoryProgress.currentCategory}</strong> 
                         <span className="ml-2 text-blue-600 font-medium">
@@ -1000,7 +1186,10 @@ export default function BeforeSignApp() {
                     <p className="text-gray-700">{risk.description}</p>
                   </div>
 
-                  {risk.originalText && (
+                  {risk.originalText && 
+                   risk.originalText.toLowerCase() !== 'n/a' && 
+                   risk.originalText.toLowerCase() !== 'not applicable' && 
+                   risk.originalText.trim() !== '' && (
                     <div>
                       <h4 className="font-medium mb-2 flex items-center">
                         <FileText className="h-4 w-4 mr-2 text-gray-600" />
@@ -1070,13 +1259,19 @@ export default function BeforeSignApp() {
                       <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
                         <div>
                           <p className="text-xs text-gray-600 mb-2">
-                            {risk.originalText && risk.originalText.toLowerCase() !== 'n/a' && risk.originalText.trim() !== '' 
+                            {risk.originalText && 
+                             risk.originalText.toLowerCase() !== 'n/a' && 
+                             risk.originalText.toLowerCase() !== 'not applicable' && 
+                             risk.originalText.trim() !== '' 
                               ? 'Clean version:' 
                               : 'Suggested text:'}
                           </p>
                           <p className="text-sm text-gray-800">"{risk.suggestedNewText}"</p>
                         </div>
-                        {risk.originalText && risk.originalText.toLowerCase() !== 'n/a' && risk.originalText.trim() !== '' && (
+                        {risk.originalText && 
+                         risk.originalText.toLowerCase() !== 'n/a' && 
+                         risk.originalText.toLowerCase() !== 'not applicable' && 
+                         risk.originalText.trim() !== '' && (
                           <div>
                             <p className="text-xs text-gray-600 mb-2">Track changes:</p>
                             <div 
