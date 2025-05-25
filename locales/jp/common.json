@@ -1,0 +1,120 @@
+{
+  "appName": "Before.sign",
+  "appDescription": "AI搭載契約リスク分析",
+  "upload": {
+    "title": "文書をアップロード",
+    "description": "契約書や法的文書をアップロードして、潜在的なリスクを分析し、詳細な推奨事項を取得してください",
+    "dropText": "ファイルをここにドロップするか、クリックして参照してください",
+    "supportText": "最大10MBのPDF、DOC、DOCXファイルをサポートしています",
+    "chooseFile": "ファイルを選択",
+    "uploading": "アップロード中...",
+    "clearError": "エラーをクリア"
+  },
+  "features": {
+    "parsing": {
+      "title": "スマート文書解析",
+      "description": "高度なAIが契約書テキストを抽出・分析します"
+    },
+    "identification": {
+      "title": "リスク識別", 
+      "description": "特定の問題のある条項や用語を識別します"
+    },
+    "recommendations": {
+      "title": "専門家の推奨事項",
+      "description": "詳細な提案と代替テキストを提供します"
+    }
+  },
+  "progress": {
+    "parsing": {
+      "title": "文書解析中",
+      "description": "AIが{fileName}の潜在的なリスクを解析しています",
+      "statusText": "通常1〜2分かかります",
+      "subText": "文書を解析中..."
+    },
+    "identifying": {
+      "title": "リスク識別中",
+      "description": "AIが文書内の潜在的なリスクを識別しています",
+      "statusText": "最も重要なリスクを最初に分析中...",
+      "subText": "最初のリスクが識別され次第、結果が表示されます"
+    }
+  },
+  "results": {
+    "title": "分析結果",
+    "analyzeAnother": "別の文書を分析",
+    "forceDeepAnalysis": "強制深層分析",
+    "risksFound": "発見されたリスク",
+    "highRisk": "高リスク",
+    "mediumRisk": "中リスク", 
+    "lowRisk": "低リスク",
+    "immediateAttention": "即座の注意が必要",
+    "reviewRecommended": "レビュー推奨",
+    "minorConcerns": "軽微な懸念"
+  },
+  "analysis": {
+    "findingMoreRisks": "さらなるリスクを検索中...",
+    "currentlyAnalyzing": "現在分析中: {category}",
+    "category": "カテゴリー {current}/{total}",
+    "newRisksWillAppear": "新しいリスクが自動的に表示されます。",
+    "analyzingRemaining": "残りのリスクカテゴリーを分析中です。新しいリスクが自動的に表示されます。",
+    "connectionIssues": "接続の問題が検出されました。再試行中...",
+    "allRisksIdentified": "すべてのリスクが識別されました！",
+    "deepAnalysisProgress": "深層分析を実行中... 現在分析中: リスク #{current}/{total}",
+    "retrying": "再試行中... ({current}/{total})"
+  },
+  "risk": {
+    "highRisk": "高リスク",
+    "mediumRisk": "中リスク",
+    "lowRisk": "低リスク", 
+    "analyzing": "分析中...",
+    "complete": "完了",
+    "riskNumber": "リスク #{number}",
+    "riskDescription": "リスクの説明",
+    "originalText": "問題のある元のテキスト",
+    "businessImpact": "ビジネスへの影響",
+    "recommendedActions": "推奨アクション",
+    "suggestedText": "提案代替テキスト",
+    "cleanVersion": "修正版:",
+    "suggestedVersion": "提案テキスト:",
+    "trackChanges": "変更の追跡:",
+    "analyzingImpact": "ビジネスへの影響と法的リスクを分析中...",
+    "highPriority": "高優先度",
+    "mediumPriority": "中優先度",
+    "lowPriority": "低優先度",
+    "highEffort": "高工数",
+    "mediumEffort": "中工数", 
+    "lowEffort": "低工数"
+  },
+  "stats": {
+    "title": "分析統計",
+    "aiModelCalls": "AIモデル呼び出し",
+    "totalAnalysisTime": "総分析時間",
+    "riskIdentification": "リスク識別",
+    "deepAnalysis": "深層分析",
+    "poweredBy": "包括的な契約レビューのための高度なAIモデルによる分析"
+  },
+  "errors": {
+    "configError": "設定エラー:",
+    "apiConfigMissing": "API設定が不足しています。UPSTAGE_API_KEY環境変数を設定してください。",
+    "apiKeyError": "APIキーエラーです。UPSTAGE_API_KEY設定を確認してください。",
+    "generalError": "文書の処理中にエラーが発生しました。もう一度お試しください。",
+    "analysisStuck": "分析が停止しているようです。APIの問題の可能性があります。もう一度お試しください。",
+    "analysisFailed": "{attempts}回の試行後、分析に失敗しました。もう一度お試しください。エラー: {error}",
+    "networkError": "ネットワークエラー、再試行中... ({current}/{total})",
+    "setupInstructions": {
+      "title": "修正方法:",
+      "getApiKey": "Upstage.aiからAPIキーを取得してください",
+      "setEnvVar": "環境変数を設定してください: UPSTAGE_API_KEY=your_key_here", 
+      "restart": "アプリケーションを再起動してください"
+    }
+  },
+  "disclaimer": {
+    "title": "免責事項:",
+    "text": "この分析は情報提供のみを目的として提供されており、法的助言とみなされるべきではありません。契約に関する具体的な法的指導については、資格のある弁護士にご相談ください。"
+  },
+  "language": {
+    "title": "言語",
+    "english": "English",
+    "korean": "한국어",
+    "japanese": "日本語"
+  }
+} 

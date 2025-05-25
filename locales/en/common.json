@@ -1,0 +1,120 @@
+{
+  "appName": "Before.sign",
+  "appDescription": "AI-powered contract risk analysis",
+  "upload": {
+    "title": "Upload Your Document",
+    "description": "Upload a contract or legal document to analyze potential risks and get detailed recommendations",
+    "dropText": "Drop your file here, or click to browse",
+    "supportText": "Supports PDF, DOC, DOCX files up to 10MB",
+    "chooseFile": "Choose File",
+    "uploading": "Uploading...",
+    "clearError": "Clear Error"
+  },
+  "features": {
+    "parsing": {
+      "title": "Smart Document Parsing",
+      "description": "Advanced AI extracts and analyzes contract text"
+    },
+    "identification": {
+      "title": "Risk Identification", 
+      "description": "Identifies specific problematic clauses and terms"
+    },
+    "recommendations": {
+      "title": "Expert Recommendations",
+      "description": "Detailed suggestions and alternative text"
+    }
+  },
+  "progress": {
+    "parsing": {
+      "title": "Parsing Document",
+      "description": "Our AI is parsing {fileName} for potential risks",
+      "statusText": "This usually takes 1-2 minutes",
+      "subText": "Parsing the document..."
+    },
+    "identifying": {
+      "title": "Identifying Risks",
+      "description": "Our AI is identifying potential risks in the document",
+      "statusText": "Analyzing the most critical risks first...",
+      "subText": "Results will appear as soon as first risks are identified"
+    }
+  },
+  "results": {
+    "title": "Analysis Results",
+    "analyzeAnother": "Analyze Another Document",
+    "forceDeepAnalysis": "Force Deep Analysis",
+    "risksFound": "Risks Found",
+    "highRisk": "High Risk",
+    "mediumRisk": "Medium Risk", 
+    "lowRisk": "Low Risk",
+    "immediateAttention": "Immediate attention",
+    "reviewRecommended": "Review recommended",
+    "minorConcerns": "Minor concerns"
+  },
+  "analysis": {
+    "findingMoreRisks": "Finding more risks...",
+    "currentlyAnalyzing": "Currently analyzing: {category}",
+    "category": "Category {current}/{total}",
+    "newRisksWillAppear": "New risks will appear automatically.",
+    "analyzingRemaining": "Analyzing remaining risk categories. New risks will appear automatically.",
+    "connectionIssues": "Connection issues detected, retrying...",
+    "allRisksIdentified": "All risks identified!",
+    "deepAnalysisProgress": "Now performing deep analysis... Currently analyzing: Risk #{current}/{total}",
+    "retrying": "Retrying... ({current}/{total})"
+  },
+  "risk": {
+    "highRisk": "HIGH RISK",
+    "mediumRisk": "MEDIUM RISK",
+    "lowRisk": "LOW RISK", 
+    "analyzing": "Analyzing...",
+    "complete": "Complete",
+    "riskNumber": "Risk #{number}",
+    "riskDescription": "Risk Description",
+    "originalText": "Original Problematic Text",
+    "businessImpact": "Business Impact",
+    "recommendedActions": "Recommended Actions",
+    "suggestedText": "Suggested Alternative Text",
+    "cleanVersion": "Clean version:",
+    "suggestedVersion": "Suggested text:",
+    "trackChanges": "Track changes:",
+    "analyzingImpact": "Analyzing business impact and legal risks...",
+    "highPriority": "HIGH PRIORITY",
+    "mediumPriority": "MEDIUM PRIORITY",
+    "lowPriority": "LOW PRIORITY",
+    "highEffort": "HIGH EFFORT",
+    "mediumEffort": "MEDIUM EFFORT", 
+    "lowEffort": "LOW EFFORT"
+  },
+  "stats": {
+    "title": "Analysis Statistics",
+    "aiModelCalls": "AI Model Calls",
+    "totalAnalysisTime": "Total Analysis Time",
+    "riskIdentification": "Risk Identification",
+    "deepAnalysis": "Deep Analysis",
+    "poweredBy": "Analysis powered by advanced AI models for comprehensive contract review"
+  },
+  "errors": {
+    "configError": "Configuration Error:",
+    "apiConfigMissing": "API configuration missing. Please set up the UPSTAGE_API_KEY environment variable.",
+    "apiKeyError": "API key error. Please check your UPSTAGE_API_KEY configuration.",
+    "generalError": "An error occurred while processing your document. Please try again.",
+    "analysisStuck": "Analysis appears to be stuck. This may be due to API issues. Please try again.",
+    "analysisFailed": "Analysis failed after {attempts} attempts. Please try again. Error: {error}",
+    "networkError": "Network error, retrying... ({current}/{total})",
+    "setupInstructions": {
+      "title": "To fix this:",
+      "getApiKey": "Get your API key from Upstage.ai",
+      "setEnvVar": "Set the environment variable: UPSTAGE_API_KEY=your_key_here", 
+      "restart": "Restart the application"
+    }
+  },
+  "disclaimer": {
+    "title": "Disclaimer:",
+    "text": "This analysis is provided for informational purposes only and should not be considered as legal advice. Please consult with a qualified attorney for specific legal guidance regarding your contract."
+  },
+  "language": {
+    "title": "Language",
+    "english": "English",
+    "korean": "한국어",
+    "japanese": "日本語"
+  }
+} 

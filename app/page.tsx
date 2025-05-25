@@ -1,12 +1,14 @@
 "use client"
 
 import React, { useState, useCallback } from "react"
-import { Upload, FileText, AlertTriangle, CheckCircle, Lightbulb, ArrowLeft, BookOpen, Shield, Target, Clock, Brain } from "lucide-react"
+import { Upload, FileText, AlertTriangle, CheckCircle, Lightbulb, ArrowLeft, BookOpen, Shield, Target, Clock, Brain, Globe } from "lucide-react"
+import { useTranslation } from 'react-i18next'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import LanguageSwitcher from "@/components/LanguageSwitcher"
 
 interface Recommendation {
   action: string
@@ -94,6 +96,7 @@ const sortRisksBySection = (risks: Risk[]): Risk[] => {
 
 
 export default function BeforeSignApp() {
+  const { t } = useTranslation()
   const [currentStep, setCurrentStep] = useState<"upload" | "parsing" | "identifying" | "results">("upload")
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [parseProgress, setParseProgress] = useState(0)
@@ -796,15 +799,20 @@ export default function BeforeSignApp() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8 pt-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Before.sign</h1>
-            <p className="text-xl text-gray-600">AI-powered contract risk analysis</p>
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex-1">
+                <h1 className="text-4xl font-bold text-gray-900 mb-2">{t('appName')}</h1>
+                <p className="text-xl text-gray-600">{t('appDescription')}</p>
+              </div>
+              <LanguageSwitcher />
+            </div>
           </div>
 
           <Card className="max-w-2xl mx-auto">
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl">Upload Your Document</CardTitle>
+              <CardTitle className="text-2xl">{t('upload.title')}</CardTitle>
               <CardDescription>
-                Upload a contract or legal document to analyze potential risks and get detailed recommendations
+                {t('upload.description')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -815,18 +823,18 @@ export default function BeforeSignApp() {
                 onClick={() => document.getElementById("file-input")?.click()}
               >
                 <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Drop your file here, or click to browse</h3>
-                <p className="text-gray-500 mb-4">Supports PDF, DOC, DOCX files up to 10MB</p>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">{t('upload.dropText')}</h3>
+                <p className="text-gray-500 mb-4">{t('upload.supportText')}</p>
                 <div className="flex gap-2 justify-center">
-                  <Button disabled={isUploading}>{isUploading ? 'Uploading...' : 'Choose File'}</Button>
+                  <Button disabled={isUploading}>{isUploading ? t('upload.uploading') : t('upload.chooseFile')}</Button>
                   {configError && (
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setConfigError(null)}
-                      className="text-red-600 border-red-200 hover:bg-red-50"
-                    >
-                      Clear Error
-                    </Button>
+                                          <Button 
+                        variant="outline" 
+                        onClick={() => setConfigError(null)}
+                        className="text-red-600 border-red-200 hover:bg-red-50"
+                      >
+                        {t('upload.clearError')}
+                      </Button>
                   )}
                 </div>
                 <input
@@ -861,18 +869,18 @@ export default function BeforeSignApp() {
               <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="text-center p-4">
                   <FileText className="mx-auto h-8 w-8 text-blue-600 mb-2" />
-                  <h4 className="font-medium">Smart Document Parsing</h4>
-                  <p className="text-sm text-gray-500">Advanced AI extracts and analyzes contract text</p>
+                  <h4 className="font-medium">{t('features.parsing.title')}</h4>
+                  <p className="text-sm text-gray-500">{t('features.parsing.description')}</p>
                 </div>
                 <div className="text-center p-4">
                   <AlertTriangle className="mx-auto h-8 w-8 text-yellow-600 mb-2" />
-                  <h4 className="font-medium">Risk Identification</h4>
-                  <p className="text-sm text-gray-500">Identifies specific problematic clauses and terms</p>
+                  <h4 className="font-medium">{t('features.identification.title')}</h4>
+                  <p className="text-sm text-gray-500">{t('features.identification.description')}</p>
                 </div>
                 <div className="text-center p-4">
                   <Lightbulb className="mx-auto h-8 w-8 text-green-600 mb-2" />
-                  <h4 className="font-medium">Expert Recommendations</h4>
-                  <p className="text-sm text-gray-500">Detailed suggestions and alternative text</p>
+                  <h4 className="font-medium">{t('features.recommendations.title')}</h4>
+                  <p className="text-sm text-gray-500">{t('features.recommendations.description')}</p>
                 </div>
               </div>
             </CardContent>
@@ -887,8 +895,8 @@ export default function BeforeSignApp() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center">
         <Card className="max-w-md mx-auto">
           <CardHeader className="text-center">
-            <CardTitle className="text-xl">Parsing Document</CardTitle>
-            <CardDescription>Our AI is parsing {uploadedFile?.name} for potential risks</CardDescription>
+            <CardTitle className="text-xl">{t('progress.parsing.title')}</CardTitle>
+            <CardDescription>{t('progress.parsing.description', { fileName: uploadedFile?.name })}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex justify-center">
@@ -897,15 +905,15 @@ export default function BeforeSignApp() {
 
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span>Parsing Progress</span>
+                <span>{t('progress.parsing.title')}</span>
                 <span>{Math.round(parseProgress)}%</span>
               </div>
               <Progress value={parseProgress} className="w-full" />
             </div>
 
             <div className="text-center text-sm text-gray-600">
-              <p>This usually takes 1-2 minutes</p>
-              <p className="mt-1">Parsing the document...</p>
+              <p>{t('progress.parsing.statusText')}</p>
+              <p className="mt-1">{t('progress.parsing.subText')}</p>
             </div>
           </CardContent>
         </Card>
@@ -918,8 +926,8 @@ export default function BeforeSignApp() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center">
         <Card className="max-w-lg mx-auto">
           <CardHeader className="text-center">
-            <CardTitle className="text-xl">Identifying Risks</CardTitle>
-            <CardDescription>Our AI is identifying potential risks in the document</CardDescription>
+            <CardTitle className="text-xl">{t('progress.identifying.title')}</CardTitle>
+            <CardDescription>{t('progress.identifying.description')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex justify-center">
@@ -928,7 +936,7 @@ export default function BeforeSignApp() {
 
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span>Risk Identification Progress</span>
+                <span>{t('progress.identifying.title')}</span>
                 <span>{Math.round(identifyProgress)}%</span>
               </div>
               <Progress value={identifyProgress} className="w-full" />
@@ -945,8 +953,8 @@ export default function BeforeSignApp() {
             )}
 
             <div className="text-center text-sm text-gray-600">
-              <p>Analyzing the most critical risks first...</p>
-              <p className="mt-1">Results will appear as soon as first risks are identified</p>
+              <p>{t('progress.identifying.statusText')}</p>
+              <p className="mt-1">{t('progress.identifying.subText')}</p>
             </div>
           </CardContent>
         </Card>
@@ -960,26 +968,26 @@ export default function BeforeSignApp() {
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Analysis Results</h1>
+              <h1 className="text-3xl font-bold text-gray-900">{t('results.title')}</h1>
               <p className="text-gray-600">{uploadedFile?.name}</p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={resetApp}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Analyze Another Document
+                {t('results.analyzeAnother')}
               </Button>
               {analysisResult && analysisResult.risks.length > 0 && (
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    console.log('Manual deep analysis trigger for', analysisResult.risks.length, 'risks')
-                    performDeepAnalysis(analysisResult.risks)
-                  }}
-                  className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-                >
-                  <Brain className="h-4 w-4 mr-2" />
-                  Force Deep Analysis
-                </Button>
+                                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      console.log('Manual deep analysis trigger for', analysisResult.risks.length, 'risks')
+                      performDeepAnalysis(analysisResult.risks)
+                    }}
+                    className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                  >
+                    <Brain className="h-4 w-4 mr-2" />
+                    {t('results.forceDeepAnalysis')}
+                  </Button>
               )}
             </div>
           </div>
@@ -991,7 +999,7 @@ export default function BeforeSignApp() {
                   <AlertTriangle className="h-8 w-8 text-red-600 mr-3" />
                   <div>
                     <p className="text-2xl font-bold">{analysisResult.totalRisks}</p>
-                    <p className="text-sm text-gray-600">Risks Found</p>
+                    <p className="text-sm text-gray-600">{t('results.risksFound')}</p>
                   </div>
                 </div>
               </CardContent>
@@ -1006,8 +1014,8 @@ export default function BeforeSignApp() {
                     </span>
                   </div>
                   <div>
-                    <p className="text-sm font-medium">High Risk</p>
-                    <p className="text-xs text-gray-600">Immediate attention</p>
+                    <p className="text-sm font-medium">{t('results.highRisk')}</p>
+                    <p className="text-xs text-gray-600">{t('results.immediateAttention')}</p>
                   </div>
                 </div>
               </CardContent>
@@ -1022,8 +1030,8 @@ export default function BeforeSignApp() {
                     </span>
                   </div>
                   <div>
-                    <p className="text-sm font-medium">Medium Risk</p>
-                    <p className="text-xs text-gray-600">Review recommended</p>
+                    <p className="text-sm font-medium">{t('results.mediumRisk')}</p>
+                    <p className="text-xs text-gray-600">{t('results.reviewRecommended')}</p>
                   </div>
                 </div>
               </CardContent>
@@ -1038,8 +1046,8 @@ export default function BeforeSignApp() {
                     </span>
                   </div>
                   <div>
-                    <p className="text-sm font-medium">Low Risk</p>
-                    <p className="text-xs text-gray-600">Minor concerns</p>
+                    <p className="text-sm font-medium">{t('results.lowRisk')}</p>
+                    <p className="text-xs text-gray-600">{t('results.minorConcerns')}</p>
                   </div>
                 </div>
               </CardContent>
@@ -1054,7 +1062,7 @@ export default function BeforeSignApp() {
                 <Brain className="h-4 w-4 text-blue-600 mr-2" />
                 <AlertDescription className="text-blue-800">
                   <div className="flex items-center">
-                    <strong>Finding more risks...</strong> 
+                    <strong>{t('analysis.findingMoreRisks')}</strong> 
                     <div className="ml-2 flex space-x-1">
                       <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
                       <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
@@ -1066,19 +1074,19 @@ export default function BeforeSignApp() {
                       <>
                         <span className="text-yellow-600 font-medium">{retryStatus}</span>
                         <br />
-                        Connection issues detected, retrying...
+                        {t('analysis.connectionIssues')}
                       </>
                     ) : categoryProgress.currentCategory ? (
                       <>
-                        Currently analyzing: <strong>{categoryProgress.currentCategory}</strong> 
+                        {t('analysis.currentlyAnalyzing', { category: categoryProgress.currentCategory })} 
                         <span className="ml-2 text-blue-600 font-medium">
-                          (Category {categoryProgress.current}/{categoryProgress.total})
+                          ({t('analysis.category', { current: categoryProgress.current, total: categoryProgress.total })})
                         </span>
                         <br />
-                        New risks will appear automatically.
+                        {t('analysis.newRisksWillAppear')}
                       </>
                     ) : (
-                      "Analyzing remaining risk categories. New risks will appear automatically."
+                      t('analysis.analyzingRemaining')
                     )}
                   </div>
                   {categoryProgress.current > 0 && (
@@ -1101,7 +1109,7 @@ export default function BeforeSignApp() {
                 <Brain className="h-4 w-4 text-green-600 mr-2" />
                 <AlertDescription className="text-green-800">
                   <div className="flex items-center">
-                    <strong>All risks identified!</strong> 
+                    <strong>{t('analysis.allRisksIdentified')}</strong> 
                     <div className="ml-2 flex space-x-1">
                       <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></div>
                       <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
@@ -1109,7 +1117,7 @@ export default function BeforeSignApp() {
                     </div>
                   </div>
                   <div className="text-sm mt-1">
-                    Now performing deep analysis... Currently analyzing: <strong>Risk #{deepAnalysisProgress.current}/{deepAnalysisProgress.total}</strong>
+                    {t('analysis.deepAnalysisProgress', { current: deepAnalysisProgress.current, total: deepAnalysisProgress.total })}
                     {deepAnalysisProgress.total > 0 && (
                       <span className="ml-2 text-green-600 font-medium">
                         ({Math.round((deepAnalysisProgress.current / deepAnalysisProgress.total) * 100)}%)
@@ -1136,26 +1144,26 @@ export default function BeforeSignApp() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <Badge className={getSeverityColor(risk.severity)}>{risk.severity.toUpperCase()} RISK</Badge>
+                        <Badge className={getSeverityColor(risk.severity)}>{t(`risk.${risk.severity}Risk`)}</Badge>
                         {risk.location && extractSectionNumber(risk.location) !== null && (
                           <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200">
                             {risk.location}
                           </Badge>
                         )}
-                        <span className="text-sm text-gray-500">Risk #{index + 1}</span>
+                        <span className="text-sm text-gray-500">{t('risk.riskNumber', { number: index + 1 })}</span>
                         {risk.location && extractSectionNumber(risk.location) === null && (
                           <span className="text-sm text-gray-500">• {risk.location}</span>
                         )}
                         {risk.isAnalyzing && (
                           <Badge className="bg-blue-100 text-blue-800">
                             <Brain className="h-3 w-3 mr-1" />
-                            Analyzing...
+                            {t('risk.analyzing')}
                           </Badge>
                         )}
                         {risk.analysisComplete && (
                           <Badge className="bg-green-100 text-green-800">
                             <CheckCircle className="h-3 w-3 mr-1" />
-                            Complete
+                            {t('risk.complete')}
                           </Badge>
                         )}
                       </div>
@@ -1181,7 +1189,7 @@ export default function BeforeSignApp() {
                   <div>
                     <h4 className="font-medium mb-2 flex items-center">
                       <BookOpen className="h-4 w-4 mr-2 text-blue-600" />
-                      Risk Description
+                      {t('risk.riskDescription')}
                     </h4>
                     <p className="text-gray-700">{risk.description}</p>
                   </div>
@@ -1193,7 +1201,7 @@ export default function BeforeSignApp() {
                     <div>
                       <h4 className="font-medium mb-2 flex items-center">
                         <FileText className="h-4 w-4 mr-2 text-gray-600" />
-                        Original Problematic Text
+                        {t('risk.originalText')}
                       </h4>
                       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                         <p className="text-sm text-gray-800 italic">"{risk.originalText}"</p>
@@ -1206,7 +1214,7 @@ export default function BeforeSignApp() {
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                       <div className="flex items-center">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                        <span className="text-sm text-gray-600">Analyzing business impact and legal risks...</span>
+                        <span className="text-sm text-gray-600">{t('risk.analyzingImpact')}</span>
                       </div>
                     </div>
                   )}
@@ -1215,7 +1223,7 @@ export default function BeforeSignApp() {
                     <div>
                       <h4 className="font-medium mb-2 flex items-center">
                         <Target className="h-4 w-4 mr-2 text-orange-600" />
-                        Business Impact
+                        {t('risk.businessImpact')}
                       </h4>
                       <p className="text-gray-700">{risk.businessImpact}</p>
                     </div>
@@ -1227,7 +1235,7 @@ export default function BeforeSignApp() {
                     <div>
                       <h4 className="font-medium mb-3 flex items-center">
                         <Lightbulb className="h-4 w-4 mr-2 text-green-600" />
-                        Recommended Actions
+                        {t('risk.recommendedActions')}
                       </h4>
                       <div className="space-y-3">
                         {risk.recommendations.map((rec, idx) => (
@@ -1237,10 +1245,10 @@ export default function BeforeSignApp() {
                               <p className="text-gray-700 mb-2">{rec.action}</p>
                               <div className="flex gap-2">
                                 <Badge className={`text-xs ${getPriorityColor(rec.priority)}`}>
-                                  {rec.priority.toUpperCase()} PRIORITY
+                                  {t(`risk.${rec.priority}Priority`)}
                                 </Badge>
                                 <Badge className={`text-xs ${getEffortColor(rec.effort)}`}>
-                                  {rec.effort.toUpperCase()} EFFORT
+                                  {t(`risk.${rec.effort}Effort`)}
                                 </Badge>
                               </div>
                             </div>
@@ -1254,7 +1262,7 @@ export default function BeforeSignApp() {
                     <div>
                       <h4 className="font-medium mb-2 flex items-center">
                         <Lightbulb className="h-4 w-4 mr-2 text-green-600" />
-                        Suggested Alternative Text
+                        {t('risk.suggestedText')}
                       </h4>
                       <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
                         <div>
@@ -1263,8 +1271,8 @@ export default function BeforeSignApp() {
                              risk.originalText.toLowerCase() !== 'n/a' && 
                              risk.originalText.toLowerCase() !== 'not applicable' && 
                              risk.originalText.trim() !== '' 
-                              ? 'Clean version:' 
-                              : 'Suggested text:'}
+                              ? t('risk.cleanVersion') 
+                              : t('risk.suggestedVersion')}
                           </p>
                           <p className="text-sm text-gray-800">"{risk.suggestedNewText}"</p>
                         </div>
@@ -1273,7 +1281,7 @@ export default function BeforeSignApp() {
                          risk.originalText.toLowerCase() !== 'not applicable' && 
                          risk.originalText.trim() !== '' && (
                           <div>
-                            <p className="text-xs text-gray-600 mb-2">Track changes:</p>
+                            <p className="text-xs text-gray-600 mb-2">{t('risk.trackChanges')}</p>
                             <div 
                               className="text-sm text-gray-800"
                               dangerouslySetInnerHTML={{
@@ -1299,30 +1307,30 @@ export default function BeforeSignApp() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center">
                 <Brain className="h-5 w-5 mr-2 text-blue-600" />
-                Analysis Statistics
+                {t('stats.title')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">{llmStats.totalCalls}</div>
-                  <div className="text-sm text-gray-600">AI Model Calls</div>
+                  <div className="text-sm text-gray-600">{t('stats.aiModelCalls')}</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-600">{(llmStats.totalTime / 1000).toFixed(1)}s</div>
-                  <div className="text-sm text-gray-600">Total Analysis Time</div>
+                  <div className="text-sm text-gray-600">{t('stats.totalAnalysisTime')}</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-purple-600">{(llmStats.identifyTime / 1000).toFixed(1)}s</div>
-                  <div className="text-sm text-gray-600">Risk Identification</div>
+                  <div className="text-sm text-gray-600">{t('stats.riskIdentification')}</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-orange-600">{(llmStats.deepAnalysisTime / 1000).toFixed(1)}s</div>
-                  <div className="text-sm text-gray-600">Deep Analysis</div>
+                  <div className="text-sm text-gray-600">{t('stats.deepAnalysis')}</div>
                 </div>
               </div>
               <div className="mt-4 text-center text-sm text-gray-500">
-                Analysis powered by advanced AI models for comprehensive contract review
+                {t('stats.poweredBy')}
               </div>
             </CardContent>
           </Card>
@@ -1330,9 +1338,7 @@ export default function BeforeSignApp() {
           <Alert className="mt-8">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Disclaimer:</strong> This analysis is provided for informational purposes only and should not be
-              considered as legal advice. Please consult with a qualified attorney for specific legal guidance regarding
-              your contract.
+              <strong>{t('disclaimer.title')}</strong> {t('disclaimer.text')}
             </AlertDescription>
           </Alert>
         </div>

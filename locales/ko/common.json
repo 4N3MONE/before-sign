@@ -1,0 +1,120 @@
+{
+  "appName": "Before.sign",
+  "appDescription": "AI 기반 계약서 위험 분석",
+  "upload": {
+    "title": "문서 업로드",
+    "description": "계약서나 법률 문서를 업로드하여 잠재적 위험을 분석하고 상세한 권장사항을 받아보세요",
+    "dropText": "파일을 여기에 드롭하거나 클릭하여 찾아보세요",
+    "supportText": "최대 10MB의 PDF, DOC, DOCX 파일을 지원합니다",
+    "chooseFile": "파일 선택",
+    "uploading": "업로드 중...",
+    "clearError": "오류 지우기"
+  },
+  "features": {
+    "parsing": {
+      "title": "스마트 문서 파싱",
+      "description": "고급 AI가 계약서 텍스트를 추출하고 분석합니다"
+    },
+    "identification": {
+      "title": "위험 식별", 
+      "description": "특정 문제 조항과 용어를 식별합니다"
+    },
+    "recommendations": {
+      "title": "전문가 권장사항",
+      "description": "상세한 제안과 대안 텍스트를 제공합니다"
+    }
+  },
+  "progress": {
+    "parsing": {
+      "title": "문서 파싱 중",
+      "description": "AI가 {fileName}에서 잠재적 위험을 파싱하고 있습니다",
+      "statusText": "보통 1-2분 정도 소요됩니다",
+      "subText": "문서를 파싱하는 중..."
+    },
+    "identifying": {
+      "title": "위험 식별 중",
+      "description": "AI가 문서에서 잠재적 위험을 식별하고 있습니다",
+      "statusText": "가장 중요한 위험을 먼저 분석하는 중...",
+      "subText": "첫 번째 위험이 식별되는 즉시 결과가 나타납니다"
+    }
+  },
+  "results": {
+    "title": "분석 결과",
+    "analyzeAnother": "다른 문서 분석",
+    "forceDeepAnalysis": "강제 심층 분석",
+    "risksFound": "발견된 위험",
+    "highRisk": "높은 위험",
+    "mediumRisk": "중간 위험", 
+    "lowRisk": "낮은 위험",
+    "immediateAttention": "즉시 주의 필요",
+    "reviewRecommended": "검토 권장",
+    "minorConcerns": "경미한 우려사항"
+  },
+  "analysis": {
+    "findingMoreRisks": "더 많은 위험을 찾는 중...",
+    "currentlyAnalyzing": "현재 분석 중: {category}",
+    "category": "카테고리 {current}/{total}",
+    "newRisksWillAppear": "새로운 위험이 자동으로 나타납니다.",
+    "analyzingRemaining": "남은 위험 카테고리를 분석하는 중입니다. 새로운 위험이 자동으로 나타납니다.",
+    "connectionIssues": "연결 문제가 감지되었습니다. 재시도 중...",
+    "allRisksIdentified": "모든 위험이 식별되었습니다!",
+    "deepAnalysisProgress": "이제 심층 분석을 수행하는 중... 현재 분석: 위험 #{current}/{total}",
+    "retrying": "재시도 중... ({current}/{total})"
+  },
+  "risk": {
+    "highRisk": "높은 위험",
+    "mediumRisk": "중간 위험",
+    "lowRisk": "낮은 위험", 
+    "analyzing": "분석 중...",
+    "complete": "완료",
+    "riskNumber": "위험 #{number}",
+    "riskDescription": "위험 설명",
+    "originalText": "문제가 있는 원본 텍스트",
+    "businessImpact": "비즈니스 영향",
+    "recommendedActions": "권장 조치",
+    "suggestedText": "제안된 대안 텍스트",
+    "cleanVersion": "정리된 버전:",
+    "suggestedVersion": "제안된 텍스트:",
+    "trackChanges": "변경 사항 추적:",
+    "analyzingImpact": "비즈니스 영향과 법적 위험을 분석하는 중...",
+    "highPriority": "높은 우선순위",
+    "mediumPriority": "중간 우선순위",
+    "lowPriority": "낮은 우선순위",
+    "highEffort": "높은 노력",
+    "mediumEffort": "중간 노력", 
+    "lowEffort": "낮은 노력"
+  },
+  "stats": {
+    "title": "분석 통계",
+    "aiModelCalls": "AI 모델 호출",
+    "totalAnalysisTime": "총 분석 시간",
+    "riskIdentification": "위험 식별",
+    "deepAnalysis": "심층 분석",
+    "poweredBy": "포괄적인 계약서 검토를 위한 고급 AI 모델 기반 분석"
+  },
+  "errors": {
+    "configError": "구성 오류:",
+    "apiConfigMissing": "API 구성이 누락되었습니다. UPSTAGE_API_KEY 환경 변수를 설정해주세요.",
+    "apiKeyError": "API 키 오류입니다. UPSTAGE_API_KEY 구성을 확인해주세요.",
+    "generalError": "문서를 처리하는 중 오류가 발생했습니다. 다시 시도해주세요.",
+    "analysisStuck": "분석이 중단된 것 같습니다. API 문제일 수 있습니다. 다시 시도해주세요.",
+    "analysisFailed": "{attempts}번 시도 후 분석에 실패했습니다. 다시 시도해주세요. 오류: {error}",
+    "networkError": "네트워크 오류, 재시도 중... ({current}/{total})",
+    "setupInstructions": {
+      "title": "해결 방법:",
+      "getApiKey": "Upstage.ai에서 API 키를 받으세요",
+      "setEnvVar": "환경 변수를 설정하세요: UPSTAGE_API_KEY=your_key_here", 
+      "restart": "애플리케이션을 재시작하세요"
+    }
+  },
+  "disclaimer": {
+    "title": "면책 조항:",
+    "text": "이 분석은 정보 제공 목적으로만 제공되며 법률 조언으로 간주되어서는 안 됩니다. 계약서에 대한 구체적인 법률 지침은 자격을 갖춘 변호사와 상담하시기 바랍니다."
+  },
+  "language": {
+    "title": "언어",
+    "english": "English",
+    "korean": "한국어",
+    "japanese": "日本語"
+  }
+} 
