@@ -41,7 +41,6 @@
   "results": {
     "title": "分析結果",
     "analyzeAnother": "別の文書を分析",
-    "forceDeepAnalysis": "強制深層分析",
     "risksFound": "発見されたリスク",
     "highRisk": "高リスク",
     "mediumRisk": "中リスク", 

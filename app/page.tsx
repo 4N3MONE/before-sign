@@ -983,19 +983,6 @@ export default function BeforeSignApp() {
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 {t('results.analyzeAnother')}
               </Button>
-              {analysisResult && analysisResult.risks.length > 0 && (
-                                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      console.log('Manual deep analysis trigger for', analysisResult.risks.length, 'risks')
-                      performDeepAnalysis(analysisResult.risks)
-                    }}
-                    className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-                  >
-                    <Brain className="h-4 w-4 mr-2" />
-                    {t('results.forceDeepAnalysis')}
-                  </Button>
-              )}
             </div>
           </div>
 

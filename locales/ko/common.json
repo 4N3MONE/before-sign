@@ -41,7 +41,6 @@
   "results": {
     "title": "분석 결과",
     "analyzeAnother": "다른 문서 분석",
-    "forceDeepAnalysis": "강제 심층 분석",
     "risksFound": "발견된 위험",
     "highRisk": "높은 위험",
     "mediumRisk": "중간 위험", 

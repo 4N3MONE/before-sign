@@ -41,7 +41,6 @@
   "results": {
     "title": "Analysis Results",
     "analyzeAnother": "Analyze Another Document",
-    "forceDeepAnalysis": "Force Deep Analysis",
     "risksFound": "Risks Found",
     "highRisk": "High Risk",
     "mediumRisk": "Medium Risk", 
