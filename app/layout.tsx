@@ -1,0 +1,26 @@
+import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Before.sign - AI Contract Risk Analysis',
+  description: 'AI-powered contract risk analysis tool that identifies potential risks and provides expert recommendations before you sign.',
+  keywords: ['contract analysis', 'legal risks', 'AI legal assistant', 'contract review', 'legal tech'],
+  authors: [{ name: 'Before.sign Team' }],
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}
