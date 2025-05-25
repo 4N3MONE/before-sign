@@ -33,13 +33,14 @@ async function callSolarLLM(messages: SolarLLMMessage[], jsonSchema?: any): Prom
   const startTime = Date.now()
   llmCallCount++
   const apiKey = process.env.UPSTAGE_API_KEY
+  const modelName = process.env.UPSTAGE_MODEL_NAME || "solar-pro2-preview"
   
   if (!apiKey) {
     throw new Error("UPSTAGE_API_KEY environment variable is required")
   }
 
   const requestBody: any = {
-    model: "solar-pro",
+    model: modelName,
     messages: messages,
     temperature: 0.1,
     max_tokens: 4000,

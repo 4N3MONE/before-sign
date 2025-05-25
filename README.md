@@ -17,9 +17,15 @@ Create a `.env.local` file in the root directory:
 
 ```bash
 UPSTAGE_API_KEY=your_upstage_api_key_here
+UPSTAGE_MODEL_NAME=solar-pro2-preview
 ```
 
 Get your API key from: https://console.upstage.ai/services/solar
+
+**Model Configuration:**
+- `UPSTAGE_MODEL_NAME` (optional): Specify which Upstage model to use
+- Default: `solar-pro2-preview` if not specified
+- Available models: `solar-pro`, `solar-pro2-preview`, etc.
 
 ### 2. Install Dependencies
 

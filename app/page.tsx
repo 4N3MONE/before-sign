@@ -880,13 +880,13 @@ export default function BeforeSignApp() {
                 <div className="flex gap-2 justify-center">
                   <Button disabled={isUploading}>{isUploading ? t('upload.uploading') : t('upload.chooseFile')}</Button>
                   {configError && (
-                                          <Button 
-                        variant="outline" 
-                        onClick={() => setConfigError(null)}
-                        className="text-red-600 border-red-200 hover:bg-red-50"
-                      >
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setConfigError(null)}
+                      className="text-red-600 border-red-200 hover:bg-red-50"
+                    >
                         {t('upload.clearError')}
-                      </Button>
+                    </Button>
                   )}
                 </div>
                 <input
