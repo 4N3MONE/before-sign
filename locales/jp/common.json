@@ -58,7 +58,7 @@
     "analyzingRemaining": "残りのリスクカテゴリーを分析中です。新しいリスクが自動的に表示されます。",
     "connectionIssues": "接続の問題が検出されました。再試行中...",
     "allRisksIdentified": "すべてのリスクが識別されました！",
-    "deepAnalysisProgress": "深層分析を実行中... 現在分析中: リスク #{current}/{total}",
+    "deepAnalysisProgress": "深層分析を実行中... 現在分析中: リスク {current}/{total}",
     "retrying": "再試行中... ({current}/{total})"
   },
   "risk": {
@@ -67,7 +67,7 @@
     "lowRisk": "低リスク", 
     "analyzing": "分析中...",
     "complete": "完了",
-    "riskNumber": "リスク #{number}",
+    "riskNumber": "リスク {number}",
     "riskDescription": "リスクの説明",
     "originalText": "問題のある元のテキスト",
     "businessImpact": "ビジネスへの影響",
@@ -116,5 +116,18 @@
     "english": "English",
     "korean": "한국어",
     "japanese": "日本語"
+  },
+  "categories": {
+    "LIABILITY": "責任",
+    "TERMINATION": "契約終了",
+    "PAYMENT": "支払い",
+    "INTELLECTUAL_PROPERTY": "知的財産権",
+    "COMPLIANCE": "コンプライアンス",
+    "Starting...": "開始中...",
+    "Category 1": "カテゴリー 1",
+    "Category 2": "カテゴリー 2",
+    "Category 3": "カテゴリー 3",
+    "Category 4": "カテゴリー 4",
+    "Category 5": "カテゴリー 5"
   }
 } 

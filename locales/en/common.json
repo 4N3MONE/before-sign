@@ -58,7 +58,7 @@
     "analyzingRemaining": "Analyzing remaining risk categories. New risks will appear automatically.",
     "connectionIssues": "Connection issues detected, retrying...",
     "allRisksIdentified": "All risks identified!",
-    "deepAnalysisProgress": "Now performing deep analysis... Currently analyzing: Risk #{current}/{total}",
+    "deepAnalysisProgress": "Now performing deep analysis... Currently analyzing: Risk {current}/{total}",
     "retrying": "Retrying... ({current}/{total})"
   },
   "risk": {
@@ -67,7 +67,7 @@
     "lowRisk": "LOW RISK", 
     "analyzing": "Analyzing...",
     "complete": "Complete",
-    "riskNumber": "Risk #{number}",
+    "riskNumber": "Risk {number}",
     "riskDescription": "Risk Description",
     "originalText": "Original Problematic Text",
     "businessImpact": "Business Impact",
@@ -116,5 +116,18 @@
     "english": "English",
     "korean": "한국어",
     "japanese": "日本語"
+  },
+  "categories": {
+    "LIABILITY": "Liability",
+    "TERMINATION": "Termination",
+    "PAYMENT": "Payment",
+    "INTELLECTUAL_PROPERTY": "Intellectual Property",
+    "COMPLIANCE": "Compliance",
+    "Starting...": "Starting...",
+    "Category 1": "Category 1",
+    "Category 2": "Category 2",
+    "Category 3": "Category 3",
+    "Category 4": "Category 4",
+    "Category 5": "Category 5"
   }
 } 

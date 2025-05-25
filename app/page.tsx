@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import LanguageSwitcher from "@/components/LanguageSwitcher"
+import I18nDebug from "@/components/I18nDebug"
 
 interface Recommendation {
   action: string
@@ -98,6 +99,12 @@ const sortRisksBySection = (risks: Risk[]): Risk[] => {
 export default function BeforeSignApp() {
   const { t } = useTranslation()
   const [currentStep, setCurrentStep] = useState<"upload" | "parsing" | "identifying" | "results">("upload")
+
+  // Helper function to translate category names
+  const translateCategory = (category: string): string => {
+    if (!category) return ""
+    return t(`categories.${category}`, { defaultValue: category })
+  }
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [parseProgress, setParseProgress] = useState(0)
   const [identifyProgress, setIdentifyProgress] = useState(0)
@@ -1078,7 +1085,7 @@ export default function BeforeSignApp() {
                       </>
                     ) : categoryProgress.currentCategory ? (
                       <>
-                        {t('analysis.currentlyAnalyzing', { category: categoryProgress.currentCategory })} 
+                        {t('analysis.currentlyAnalyzing', { category: translateCategory(categoryProgress.currentCategory) })} 
                         <span className="ml-2 text-blue-600 font-medium">
                           ({t('analysis.category', { current: categoryProgress.current, total: categoryProgress.total })})
                         </span>
@@ -1265,17 +1272,7 @@ export default function BeforeSignApp() {
                         {t('risk.suggestedText')}
                       </h4>
                       <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
-                        <div>
-                          <p className="text-xs text-gray-600 mb-2">
-                            {risk.originalText && 
-                             risk.originalText.toLowerCase() !== 'n/a' && 
-                             risk.originalText.toLowerCase() !== 'not applicable' && 
-                             risk.originalText.trim() !== '' 
-                              ? t('risk.cleanVersion') 
-                              : t('risk.suggestedVersion')}
-                          </p>
-                          <p className="text-sm text-gray-800">"{risk.suggestedNewText}"</p>
-                        </div>
+                        {/* Show track changes first when original text exists */}
                         {risk.originalText && 
                          risk.originalText.toLowerCase() !== 'n/a' && 
                          risk.originalText.toLowerCase() !== 'not applicable' && 
@@ -1292,6 +1289,18 @@ export default function BeforeSignApp() {
                             />
                           </div>
                         )}
+                        {/* Then show clean version */}
+                        <div>
+                          <p className="text-xs text-gray-600 mb-2">
+                            {risk.originalText && 
+                             risk.originalText.toLowerCase() !== 'n/a' && 
+                             risk.originalText.toLowerCase() !== 'not applicable' && 
+                             risk.originalText.trim() !== '' 
+                              ? t('risk.cleanVersion') 
+                              : t('risk.suggestedVersion')}
+                          </p>
+                          <p className="text-sm text-gray-800">"{risk.suggestedNewText}"</p>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1341,6 +1350,7 @@ export default function BeforeSignApp() {
               <strong>{t('disclaimer.title')}</strong> {t('disclaimer.text')}
             </AlertDescription>
           </Alert>
+          <I18nDebug />
         </div>
       </div>
     )

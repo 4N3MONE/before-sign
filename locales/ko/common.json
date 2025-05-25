@@ -58,7 +58,7 @@
     "analyzingRemaining": "남은 위험 카테고리를 분석하는 중입니다. 새로운 위험이 자동으로 나타납니다.",
     "connectionIssues": "연결 문제가 감지되었습니다. 재시도 중...",
     "allRisksIdentified": "모든 위험이 식별되었습니다!",
-    "deepAnalysisProgress": "이제 심층 분석을 수행하는 중... 현재 분석: 위험 #{current}/{total}",
+    "deepAnalysisProgress": "이제 심층 분석을 수행하는 중... 현재 분석: 위험 {current}/{total}",
     "retrying": "재시도 중... ({current}/{total})"
   },
   "risk": {
@@ -67,7 +67,7 @@
     "lowRisk": "낮은 위험", 
     "analyzing": "분석 중...",
     "complete": "완료",
-    "riskNumber": "위험 #{number}",
+    "riskNumber": "위험 {number}",
     "riskDescription": "위험 설명",
     "originalText": "문제가 있는 원본 텍스트",
     "businessImpact": "비즈니스 영향",
@@ -116,5 +116,18 @@
     "english": "English",
     "korean": "한국어",
     "japanese": "日本語"
+  },
+  "categories": {
+    "LIABILITY": "책임",
+    "TERMINATION": "계약 종료",
+    "PAYMENT": "지불",
+    "INTELLECTUAL_PROPERTY": "지적 재산권",
+    "COMPLIANCE": "규정 준수",
+    "Starting...": "시작 중...",
+    "Category 1": "카테고리 1",
+    "Category 2": "카테고리 2",
+    "Category 3": "카테고리 3",
+    "Category 4": "카테고리 4",
+    "Category 5": "카테고리 5"
   }
 } 

@@ -64,6 +64,8 @@ i18n
     
     interpolation: {
       escapeValue: false,
+      prefix: '{',
+      suffix: '}',
     },
     
     // Debug mode - set to false in production
