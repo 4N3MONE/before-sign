@@ -47,7 +47,17 @@ async function callSolarLLM(messages: SolarLLMMessage[], jsonSchema?: any): Prom
   const apiKey = process.env.UPSTAGE_API_KEY
   const modelName = process.env.UPSTAGE_MODEL_NAME || "solar-pro2-preview"
   
+  // Debug environment variables
+  console.log(`🔧 [remaining-risks] Environment Check:`, {
+    has_api_key: !!apiKey,
+    api_key_length: apiKey?.length,
+    api_key_preview: apiKey ? `${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}` : 'MISSING',
+    model_name: modelName,
+    model_name_source: process.env.UPSTAGE_MODEL_NAME ? 'env_var' : 'default'
+  })
+  
   if (!apiKey) {
+    console.error(`❌ [remaining-risks] UPSTAGE_API_KEY environment variable is missing!`)
     throw new Error("UPSTAGE_API_KEY environment variable is required")
   }
 
@@ -70,6 +80,18 @@ async function callSolarLLM(messages: SolarLLMMessage[], jsonSchema?: any): Prom
     }
   }
 
+  // Debug logging
+  console.log(`🔥 [remaining-risks] LLM Call #${llmCallCount} - Model: ${modelName}`)
+  console.log(`📝 [remaining-risks] Request Body:`, {
+    model: requestBody.model,
+    temperature: requestBody.temperature,
+    max_tokens: requestBody.max_tokens,
+    top_p: requestBody.top_p,
+    messages_count: requestBody.messages?.length,
+    has_json_schema: !!requestBody.response_format,
+    first_message_preview: requestBody.messages?.[0]?.content?.substring(0, 200) + '...'
+  })
+
   // Retry logic with exponential backoff
   const maxRetries = 3
   let retryCount = 0
@@ -79,10 +101,12 @@ async function callSolarLLM(messages: SolarLLMMessage[], jsonSchema?: any): Prom
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 300000) // 300 seconds timeout
 
+      console.log(`📡 [remaining-risks] Making API request to Upstage (attempt ${retryCount + 1}/${maxRetries + 1})...`)
+      
       const response = await fetch('https://api.upstage.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': `Bearer ${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
@@ -91,33 +115,69 @@ async function callSolarLLM(messages: SolarLLMMessage[], jsonSchema?: any): Prom
 
       clearTimeout(timeoutId)
 
+      console.log(`📊 [remaining-risks] Response Status: ${response.status} ${response.statusText}`)
+      console.log(`📊 [remaining-risks] Response Headers:`, Object.fromEntries(response.headers.entries()))
+
       if (!response.ok) {
         const errorText = await response.text()
+        console.error(`❌ [remaining-risks] Error Response Body:`, errorText)
+        
+        // Try to parse error as JSON for better logging
+        try {
+          const errorJson = JSON.parse(errorText)
+          console.error(`❌ [remaining-risks] Parsed Error:`, errorJson)
+        } catch (parseError) {
+          console.error(`❌ [remaining-risks] Raw Error Text:`, errorText)
+        }
+        
         throw new Error(`Upstage SolarLLM API error: ${response.status} - ${errorText}`)
       }
 
-      const result: SolarLLMResponse = await response.json()
+      const responseText = await response.text()
+      console.log(`✅ [remaining-risks] Raw Response Body (first 500 chars):`, responseText.substring(0, 500) + (responseText.length > 500 ? '...' : ''))
+      
+      const result: SolarLLMResponse = JSON.parse(responseText)
+      console.log(`✅ [remaining-risks] Parsed Response:`, {
+        id: result.id,
+        model: result.model,
+        choices_count: result.choices?.length,
+        finish_reason: result.choices?.[0]?.finish_reason,
+        content_length: result.choices?.[0]?.message?.content?.length,
+        usage: result.usage
+      })
       
       if (!result.choices || result.choices.length === 0) {
+        console.error(`❌ [remaining-risks] No choices in response:`, result)
         throw new Error("No response from SolarLLM")
       }
 
       const endTime = Date.now()
-      totalLLMTime += (endTime - startTime)
+      const duration = endTime - startTime
+      totalLLMTime += duration
+      
+      console.log(`⏱️ [remaining-risks] Call completed in ${duration}ms (total: ${totalLLMTime}ms)`)
+      console.log(`📋 [remaining-risks] Response Content Preview:`, result.choices[0].message.content.substring(0, 200) + '...')
 
       return result.choices[0].message.content
 
     } catch (error) {
       retryCount++
-      console.error(`Upstage API call failed (attempt ${retryCount}/${maxRetries + 1}):`, error)
+      console.error(`❌ [remaining-risks] Upstage API call failed (attempt ${retryCount}/${maxRetries + 1}):`, error)
+      
+      if (error instanceof Error) {
+        console.error(`❌ [remaining-risks] Error Type: ${error.constructor.name}`)
+        console.error(`❌ [remaining-risks] Error Message: ${error.message}`)
+        console.error(`❌ [remaining-risks] Error Stack:`, error.stack)
+      }
       
       if (retryCount > maxRetries) {
+        console.error(`🚫 [remaining-risks] All retry attempts exhausted. Final error:`, error)
         throw new Error(`Upstage API failed after ${maxRetries + 1} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
       
       // Exponential backoff: wait 2^retryCount seconds
       const backoffMs = Math.pow(2, retryCount) * 1000
-      console.log(`Retrying in ${backoffMs}ms...`)
+      console.log(`⏳ [remaining-risks] Retrying in ${backoffMs}ms...`)
       await new Promise(resolve => setTimeout(resolve, backoffMs))
     }
   }
