@@ -936,6 +936,49 @@ export default function BeforeSignApp() {
                 </div>
               </div>
 
+              {/* Powered By and Open Source Information */}
+              <Card className="mt-8 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+                <CardContent className="p-6">
+                  <div className="text-center space-y-4">
+                    <div className="flex items-center justify-center space-x-2">
+                      <Shield className="h-5 w-5 text-blue-600" />
+                      <span className="text-lg font-medium text-gray-800">Powered by</span>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-gray-700">
+                        <a 
+                          href="https://console.upstage.ai" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 font-medium underline"
+                        >
+                          Upstage Document Parse & Solar LLM
+                        </a>
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Advanced AI technology for intelligent document analysis
+                      </p>
+                    </div>
+                    <div className="pt-2 border-t border-blue-200">
+                      <div className="flex items-center justify-center space-x-2">
+                        <BookOpen className="h-4 w-4 text-green-600" />
+                        <span className="text-sm text-gray-700">
+                          Open Source • Available on{" "}
+                          <a 
+                            href="https://github.com/hunkim/before-sign" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-green-600 hover:text-green-800 font-medium underline"
+                          >
+                            GitHub
+                          </a>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Important Disclaimer */}
               <Alert className="mt-8 border-amber-200 bg-amber-50">
                 <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -1424,6 +1467,49 @@ export default function BeforeSignApp() {
               <strong>{t('disclaimer.title')}</strong> {t('disclaimer.text')}
             </AlertDescription>
           </Alert>
+
+          {/* Powered By and Open Source Information */}
+          <Card className="mt-8 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+            <CardContent className="p-6">
+              <div className="text-center space-y-4">
+                <div className="flex items-center justify-center space-x-2">
+                  <Brain className="h-5 w-5 text-blue-600" />
+                  <span className="text-lg font-medium text-gray-800">Powered by</span>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-gray-700">
+                    <a 
+                      href="https://console.upstage.ai" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 font-medium underline"
+                    >
+                      Upstage Document Parse & Solar LLM
+                    </a>
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Advanced AI technology for intelligent document analysis
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-blue-200">
+                  <div className="flex items-center justify-center space-x-2">
+                    <Globe className="h-4 w-4 text-green-600" />
+                    <span className="text-sm text-gray-700">
+                      Open Source • Available on{" "}
+                      <a 
+                        href="https://github.com/hunkim/before-sign" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-green-600 hover:text-green-800 font-medium underline"
+                      >
+                        GitHub
+                      </a>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
           <I18nDebug />
         </div>
       </div>

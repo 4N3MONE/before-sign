@@ -26,8 +26,6 @@ export async function GET() {
         body: JSON.stringify({
           model: "solar-pro2-preview",
           messages: [{ role: "user", content: "Test" }],
-          max_tokens: 5,
-          reasoning_effort: "high"
         }),
         signal: AbortSignal.timeout(10000) // 10 second timeout
       })

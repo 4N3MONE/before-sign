@@ -28,7 +28,7 @@ interface UpstageDocumentParseResponse {
 }
 
 async function parseDocumentWithUpstage(file: File): Promise<UpstageDocumentParseResponse> {
-  const apiKey = process.env.UPSTAGE_API_KEY
+  const apiKey = process.env.UPSTAGE_API_KEY?.trim()
   
   if (!apiKey) {
     throw new Error("UPSTAGE_API_KEY environment variable is required")

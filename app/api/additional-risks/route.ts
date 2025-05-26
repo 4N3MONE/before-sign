@@ -44,7 +44,7 @@ async function callSolarLLM(messages: SolarLLMMessage[], jsonSchema?: any): Prom
   const startTime = Date.now()
   llmCallCount++
   
-  const apiKey = process.env.UPSTAGE_API_KEY
+  const apiKey = process.env.UPSTAGE_API_KEY?.trim()
   const modelName = process.env.UPSTAGE_MODEL_NAME || "solar-pro2-preview"
   
   if (!apiKey) {
