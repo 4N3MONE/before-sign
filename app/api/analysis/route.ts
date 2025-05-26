@@ -70,6 +70,11 @@ async function callSolarLLM(messages: SolarLLMMessage[], jsonSchema?: any): Prom
     top_p: 0.9,
   }
 
+  // Add reasoning parameters for solar-pro2-preview model
+  if (modelName === "solar-pro2-preview") {
+    requestBody.reasoning_effort = "high"
+  }
+
   if (jsonSchema) {
     requestBody.response_format = {
       type: "json_schema",

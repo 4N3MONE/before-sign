@@ -57,6 +57,11 @@ async function callSolarLLM(messages: SolarLLMMessage[], jsonSchema?: any): Prom
     top_p: 0.9,
   }
 
+  // Add reasoning parameters for solar-pro2-preview model
+  if (modelName === "solar-pro2-preview") {
+    requestBody.reasoning_effort = "high"
+  }
+
   if (jsonSchema) {
     requestBody.response_format = {
       type: "json_schema",
@@ -75,6 +80,7 @@ async function callSolarLLM(messages: SolarLLMMessage[], jsonSchema?: any): Prom
     temperature: requestBody.temperature,
     max_tokens: requestBody.max_tokens,
     top_p: requestBody.top_p,
+    reasoning_effort: requestBody.reasoning_effort,
     messages_count: requestBody.messages?.length,
     has_json_schema: !!requestBody.response_format,
     first_message_preview: requestBody.messages?.[0]?.content?.substring(0, 200) + '...'
@@ -94,7 +100,7 @@ async function callSolarLLM(messages: SolarLLMMessage[], jsonSchema?: any): Prom
       const response = await fetch('https://api.upstage.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}`,
+          'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),

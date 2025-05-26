@@ -26,6 +26,7 @@ Get your API key from: https://console.upstage.ai/services/solar
 - `UPSTAGE_MODEL_NAME` (optional): Specify which Upstage model to use
 - Default: `solar-pro2-preview` if not specified
 - Available models: `solar-pro`, `solar-pro2-preview`, etc.
+- **Note**: `solar-pro2-preview` is a reasoning model that automatically includes `reasoning_effort: "high"` parameter
 
 ### 2. Install Dependencies
 

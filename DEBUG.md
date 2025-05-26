@@ -34,6 +34,7 @@ When you upload a contract and analyze it, look for these console logs:
   temperature: 0.1,
   max_tokens: 4000,
   top_p: 0.9,
+  reasoning_effort: "high",
   messages_count: 2,
   has_json_schema: true,
   first_message_preview: "You are an expert legal contract analyst..."
