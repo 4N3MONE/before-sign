@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback } from "react"
-import { Upload, FileText, AlertTriangle, CheckCircle, Lightbulb, ArrowLeft, BookOpen, Shield, Target, Clock, Brain, Globe } from "lucide-react"
+import { Upload, FileText, AlertTriangle, CheckCircle, Lightbulb, ArrowLeft, BookOpen, Shield, Target, Clock, Brain, Globe, Share2, Copy, Check } from "lucide-react"
 import { useTranslation } from 'react-i18next'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -70,9 +70,18 @@ const extractSectionNumber = (location?: string): number | null => {
   return null
 }
 
-// Helper function to sort risks by section number
-const sortRisksBySection = (risks: Risk[]): Risk[] => {
+// Helper function to sort risks by severity first, then by section number
+const sortRisksBySeverityAndSection = (risks: Risk[]): Risk[] => {
   return [...risks].sort((a, b) => {
+    // First, sort by severity (high > medium > low)
+    const severityOrder = { 'high': 0, 'medium': 1, 'low': 2 }
+    const severityDiff = severityOrder[a.severity] - severityOrder[b.severity]
+    
+    if (severityDiff !== 0) {
+      return severityDiff // Different severities, sort by severity
+    }
+    
+    // Same severity, sort by section number
     const sectionA = extractSectionNumber(a.location)
     const sectionB = extractSectionNumber(b.location)
     
@@ -93,8 +102,6 @@ const sortRisksBySection = (risks: Risk[]): Risk[] => {
     return 0
   })
 }
-
-
 
 export default function BeforeSignApp() {
   const { t } = useTranslation()
@@ -132,6 +139,11 @@ export default function BeforeSignApp() {
     canRetry: boolean,
     retryData?: any
   } | null>(null)
+
+  // Share functionality state
+  const [isSharing, setIsSharing] = useState(false)
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const [showShareSuccess, setShowShareSuccess] = useState(false)
 
   const createDiffText = (originalText: string, suggestedText: string): string => {
     if (!originalText || !suggestedText) return ""
@@ -225,7 +237,7 @@ export default function BeforeSignApp() {
       )
       
       // Re-sort risks to maintain order, especially if location was updated
-      const sortedRisks = sortRisksBySection(updatedRisks)
+      const sortedRisks = sortRisksBySeverityAndSection(updatedRisks)
       
       return {
         ...prev,
@@ -309,7 +321,7 @@ export default function BeforeSignApp() {
             }))]
             
             // Sort risks by section number
-            const updatedRisks = sortRisksBySection(newRisks)
+            const updatedRisks = sortRisksBySeverityAndSection(newRisks)
             allRisks = updatedRisks
             
             return {
@@ -327,7 +339,7 @@ export default function BeforeSignApp() {
               // Update summary even if no risks found, but maintain current sorting
               return {
                 ...prev,
-                risks: sortRisksBySection(prev.risks), // Re-sort in case location info was updated
+                risks: sortRisksBySeverityAndSection(prev.risks), // Re-sort in case location info was updated
                 summary: `${prev.summary} ${categoryRisks.summary}.`
               }
             }
@@ -670,7 +682,7 @@ export default function BeforeSignApp() {
       
       setAnalysisResult({
         totalRisks: firstCategoryRisks.risks.length,
-        risks: sortRisksBySection(initialRisks),
+        risks: sortRisksBySeverityAndSection(initialRisks),
         summary: firstCategoryRisks.summary || "Initial liability analysis complete. Analyzing remaining categories...",
         analysisComplete: false
       })
@@ -844,6 +856,77 @@ export default function BeforeSignApp() {
       identifyTime: 0,
       deepAnalysisTime: 0
     })
+    // Clear share state
+    setIsSharing(false)
+    setShareUrl(null)
+    setShowShareSuccess(false)
+  }
+
+  const handleShareReport = async () => {
+    if (!analysisResult || !uploadedFile) return
+
+    setIsSharing(true)
+    try {
+      const response = await fetch('/api/share-report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          analysisResult,
+          fileName: uploadedFile.name,
+          llmStats
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.error || `Server error: ${response.status}`
+        throw new Error(errorMessage)
+      }
+
+      const data = await response.json()
+      setShareUrl(data.shareUrl)
+      setShowShareSuccess(true)
+      
+      // Hide success message after 3 seconds
+      setTimeout(() => setShowShareSuccess(false), 3000)
+    } catch (error) {
+      console.error('Error sharing report:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      
+      // Show more detailed error message
+      if (errorMessage.includes('Firebase') || errorMessage.includes('Firestore')) {
+        alert('Database connection error. Please check your Firebase configuration and try again.')
+      } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+        alert('Network error. Please check your internet connection and try again.')
+      } else {
+        alert(`Failed to create shareable link: ${errorMessage}`)
+      }
+    } finally {
+      setIsSharing(false)
+    }
+  }
+
+  const copyShareUrl = async () => {
+    if (!shareUrl) return
+    
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setShowShareSuccess(true)
+      setTimeout(() => setShowShareSuccess(false), 2000)
+    } catch (error) {
+      console.error('Failed to copy URL:', error)
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea')
+      textArea.value = shareUrl
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      setShowShareSuccess(true)
+      setTimeout(() => setShowShareSuccess(false), 2000)
+    }
   }
 
   if (currentStep === "upload") {
@@ -1075,12 +1158,87 @@ export default function BeforeSignApp() {
               <p className="text-gray-600">{uploadedFile?.name}</p>
             </div>
             <div className="flex gap-2">
+              {/* Share Button */}
+              <div className="relative">
+                <Button 
+                  variant="default" 
+                  onClick={handleShareReport}
+                  disabled={
+                    isSharing || 
+                    !analysisResult || 
+                    isGettingRemainingRisks || 
+                    currentAnalyzingRisk !== null ||
+                    (analysisResult && analysisResult.risks.some(risk => risk.isAnalyzing))
+                  }
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
+                >
+                  {isSharing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Sharing...
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="h-4 w-4 mr-2" />
+                      {isGettingRemainingRisks || currentAnalyzingRisk ? 'Analysis in Progress...' : 'Share Report'}
+                    </>
+                  )}
+                </Button>
+                
+                {/* Show helpful message when analysis is incomplete */}
+                {(isGettingRemainingRisks || currentAnalyzingRisk) && (
+                  <div className="absolute top-full left-0 mt-1 text-xs text-gray-500 whitespace-nowrap">
+                    Share will be available when analysis completes
+                  </div>
+                )}
+              </div>
+              
               <Button variant="outline" onClick={resetApp}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 {t('results.analyzeAnother')}
               </Button>
             </div>
           </div>
+
+          {/* Share Success Notification */}
+          {shareUrl && (
+            <Alert className="mb-6 bg-green-50 border-green-200">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <strong>Report shared successfully!</strong>
+                    <p className="text-sm mt-1">
+                      Anyone with this link can view the analysis results. The link will expire in 30 days.
+                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <code className="bg-green-100 px-2 py-1 rounded text-sm text-green-800 flex-1 truncate">
+                        {shareUrl}
+                      </code>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={copyShareUrl}
+                        className="border-green-300 text-green-700 hover:bg-green-100"
+                      >
+                        {showShareSuccess ? (
+                          <>
+                            <Check className="h-3 w-3 mr-1" />
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3 mr-1" />
+                            Copy
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
             <Card>
@@ -1353,8 +1511,6 @@ export default function BeforeSignApp() {
                     </div>
                   )}
 
-
-
                   {risk.recommendations && risk.recommendations.length > 0 && (
                     <div>
                       <h4 className="font-medium mb-3 flex items-center">
@@ -1425,8 +1581,6 @@ export default function BeforeSignApp() {
               </Card>
             ))}
           </div>
-
-
 
           {/* LLM Statistics */}
           <Card className="mt-8 bg-gray-50">
