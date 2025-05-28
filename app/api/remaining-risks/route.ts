@@ -189,7 +189,7 @@ async function callSolarLLM(messages: SolarLLMMessage[], jsonSchema?: any): Prom
   }
 }
 
-async function identifyRisksInCategory(contractText: string, category: string, focusAreas: string[]): Promise<RiskIdentificationResult> {
+async function identifyRisksInCategory(contractText: string, category: string, focusAreas: string[], selectedParty: any = null): Promise<RiskIdentificationResult> {
   const schema = {
     type: "object",
     properties: {
@@ -212,10 +212,16 @@ async function identifyRisksInCategory(contractText: string, category: string, f
     required: ["risks", "summary"]
   }
 
+  const partyPerspective = selectedParty 
+    ? `You are analyzing this contract from the perspective of "${selectedParty.name}" (${selectedParty.description}). Focus on risks that could negatively impact ${selectedParty.name} specifically.` 
+    : `Analyze this contract from a general risk perspective.`
+
   const messages: SolarLLMMessage[] = [
     {
       role: "system",
       content: `You are an expert legal contract analyst with a specialty in ${category} risks. Your task is to exhaustively identify ALL potential risks in this category, even minor ones that could become problems later.
+
+${partyPerspective}
 
 CRITICAL INSTRUCTIONS:
 - Be AGGRESSIVE in finding risks - better to flag something questionable than miss a real risk
@@ -225,12 +231,13 @@ CRITICAL INSTRUCTIONS:
 - Classify severity: high (immediate danger), medium (potentially problematic), low (minor but worth noting)
 - Identify specific location/section where each risk was found
 - Focus specifically on ${category} but don't ignore other obvious risks you encounter
+${selectedParty ? `- Prioritize risks that specifically disadvantage or expose "${selectedParty.name}" to liability or unfavorable terms` : ''}
 
 Remember: Clients rely on you to catch everything. Missing a risk could be costly.`
     },
     {
       role: "user",
-      content: `Thoroughly analyze this contract for ${category} risks. Find EVERY potential issue in this category:
+      content: `Thoroughly analyze this contract for ${category} risks${selectedParty ? ` that could negatively impact "${selectedParty.name}"` : ''}. Find EVERY potential issue in this category:
 
 ${contractText}
 
@@ -238,10 +245,12 @@ Specific ${category} risks to find:
 ${focusAreas.map(area => `- ${area}`).join('\n')}
 
 Look for both:
-1. Explicit problematic clauses that create risks
-2. Missing protective language that should be present
-3. Vague or ambiguous terms that could be interpreted unfavorably
-4. Standard contract provisions that favor the other party
+1. Explicit problematic clauses that create risks${selectedParty ? ` for "${selectedParty.name}"` : ''}
+2. Missing protective language that should be present${selectedParty ? ` to protect "${selectedParty.name}"` : ''}
+3. Vague or ambiguous terms that could be interpreted unfavorably${selectedParty ? ` against "${selectedParty.name}"` : ''}
+4. Standard contract provisions that favor the other party${selectedParty ? ` over "${selectedParty.name}"` : ''}
+
+${selectedParty ? `Remember: You are specifically looking out for "${selectedParty.name}" (${selectedParty.description}). What would be risky or disadvantageous for them in this contract?` : ''}
 
 Be thorough - find every potential risk, no matter how small.`
     }
@@ -282,7 +291,7 @@ function levenshteinDistance(str1: string, str2: string): number {
   return matrix[str2.length][str1.length]
 }
 
-async function getNextCategoryRisks(contractText: string, existingRiskTexts: string[], categoryIndex: number = 0): Promise<RiskIdentificationResult & { llmStats: { calls: number; totalTime: number }; categoryAnalyzed: string; hasMoreCategories: boolean; nextCategoryIndex: number }> {
+async function getNextCategoryRisks(contractText: string, existingRiskTexts: string[], categoryIndex: number = 0, selectedParty: any = null): Promise<RiskIdentificationResult & { llmStats: { calls: number; totalTime: number }; categoryAnalyzed: string; hasMoreCategories: boolean; nextCategoryIndex: number }> {
   // Reset counters for new analysis
   llmCallCount = 0
   totalLLMTime = 0
@@ -359,7 +368,7 @@ async function getNextCategoryRisks(contractText: string, existingRiskTexts: str
   console.log(`Analyzing ${category} risks (category ${categoryIndex + 1}/${remainingCategories.length})...`)
 
   try {
-    const result = await identifyRisksInCategory(contractText, category, focusAreas)
+    const result = await identifyRisksInCategory(contractText, category, focusAreas, selectedParty)
     
     let newRisks: any[] = []
     if (result.risks && result.risks.length > 0) {
@@ -401,7 +410,7 @@ async function getNextCategoryRisks(contractText: string, existingRiskTexts: str
 
 export async function POST(req: Request) {
   try {
-    const { text, existingRisks = [], categoryIndex = 0 } = await req.json()
+    const { text, existingRisks = [], categoryIndex = 0, selectedParty = null } = await req.json()
 
     if (!text) {
       return NextResponse.json({ error: "Contract text is required" }, { status: 400 })
@@ -412,7 +421,7 @@ export async function POST(req: Request) {
 
     try {
       // Get risks from the next category
-      const categoryRisks = await getNextCategoryRisks(text, existingRiskTexts, categoryIndex)
+      const categoryRisks = await getNextCategoryRisks(text, existingRiskTexts, categoryIndex, selectedParty)
       
       // Convert to format expected by frontend
       const risks = categoryRisks.risks.map((risk: any, index: number) => ({

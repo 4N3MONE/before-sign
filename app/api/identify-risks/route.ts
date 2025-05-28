@@ -189,7 +189,7 @@ async function callSolarLLM(messages: SolarLLMMessage[], jsonSchema?: any): Prom
   }
 }
 
-async function identifyRisksInCategory(contractText: string, category: string, focusAreas: string[]): Promise<RiskIdentificationResult> {
+async function identifyRisksInCategory(contractText: string, category: string, focusAreas: string[], selectedParty: any = null): Promise<RiskIdentificationResult> {
   const schema = {
     type: "object",
     properties: {
@@ -212,10 +212,16 @@ async function identifyRisksInCategory(contractText: string, category: string, f
     required: ["risks", "summary"]
   }
 
+  const partyPerspective = selectedParty 
+    ? `You are analyzing this contract from the perspective of "${selectedParty.name}" (${selectedParty.description}). Focus on risks that could negatively impact ${selectedParty.name} specifically.` 
+    : `Analyze this contract from a general risk perspective.`
+
   const messages: SolarLLMMessage[] = [
     {
       role: "system",
       content: `You are an expert legal contract analyst with a specialty in ${category} risks. Your task is to exhaustively identify ALL potential risks in this category, even minor ones that could become problems later.
+
+${partyPerspective}
 
 CRITICAL INSTRUCTIONS:
 - Be AGGRESSIVE in finding risks - better to flag something questionable than miss a real risk
@@ -225,12 +231,13 @@ CRITICAL INSTRUCTIONS:
 - Classify severity: high (immediate danger), medium (potentially problematic), low (minor but worth noting)
 - Identify specific location/section where each risk was found
 - Focus specifically on ${category} but don't ignore other obvious risks you encounter
+${selectedParty ? `- Prioritize risks that specifically disadvantage or expose "${selectedParty.name}" to liability or unfavorable terms` : ''}
 
 Remember: Clients rely on you to catch everything. Missing a risk could be costly.`
     },
     {
       role: "user",
-      content: `Thoroughly analyze this contract for ${category} risks. Find EVERY potential issue in this category:
+      content: `Thoroughly analyze this contract for ${category} risks${selectedParty ? ` that could negatively impact "${selectedParty.name}"` : ''}. Find EVERY potential issue in this category:
 
 ${contractText}
 
@@ -238,10 +245,12 @@ Specific ${category} risks to find:
 ${focusAreas.map(area => `- ${area}`).join('\n')}
 
 Look for both:
-1. Explicit problematic clauses that create risks
-2. Missing protective language that should be present
-3. Vague or ambiguous terms that could be interpreted unfavorably
-4. Standard contract provisions that favor the other party
+1. Explicit problematic clauses that create risks${selectedParty ? ` for "${selectedParty.name}"` : ''}
+2. Missing protective language that should be present${selectedParty ? ` to protect "${selectedParty.name}"` : ''}
+3. Vague or ambiguous terms that could be interpreted unfavorably${selectedParty ? ` against "${selectedParty.name}"` : ''}
+4. Standard contract provisions that favor the other party${selectedParty ? ` over "${selectedParty.name}"` : ''}
+
+${selectedParty ? `Remember: You are specifically looking out for "${selectedParty.name}" (${selectedParty.description}). What would be risky or disadvantageous for them in this contract?` : ''}
 
 Be thorough - find every potential risk, no matter how small.`
     }
@@ -251,7 +260,7 @@ Be thorough - find every potential risk, no matter how small.`
   return JSON.parse(content)
 }
 
-async function identifyRisks(contractText: string, mode: 'quick' | 'comprehensive' = 'comprehensive', firstCategoryOnly: boolean = false): Promise<RiskIdentificationResult & { llmStats: { calls: number; totalTime: number }; hasMoreCategories?: boolean; currentProgress?: string }> {
+async function identifyRisks(contractText: string, mode: 'quick' | 'comprehensive' = 'comprehensive', firstCategoryOnly: boolean = false, selectedParty: any = null): Promise<RiskIdentificationResult & { llmStats: { calls: number; totalTime: number }; hasMoreCategories?: boolean; currentProgress?: string }> {
   // Reset counters for new analysis
   llmCallCount = 0
   totalLLMTime = 0
@@ -344,7 +353,7 @@ async function identifyRisks(contractText: string, mode: 'quick' | 'comprehensiv
   for (const { category, focusAreas } of categoriesToAnalyze) {
     try {
       console.log(`Analyzing ${category} risks...`)
-      const result = await identifyRisksInCategory(contractText, category, focusAreas)
+      const result = await identifyRisksInCategory(contractText, category, focusAreas, selectedParty)
       
       if (result.risks && result.risks.length > 0) {
         // Add new risks, avoiding duplicates
@@ -414,18 +423,19 @@ function levenshteinDistance(str1: string, str2: string): number {
 
 export async function POST(req: Request) {
   try {
-    const { text, mode = 'comprehensive', firstCategoryOnly = false } = await req.json()
+    const { text, mode = 'comprehensive', firstCategoryOnly = false, selectedParty = null } = await req.json()
 
     if (!text) {
       return NextResponse.json({ error: "Contract text is required" }, { status: 400 })
     }
 
     const analysisMode = mode as 'quick' | 'comprehensive'
-    console.log(`Starting ${firstCategoryOnly ? 'first-category-only' : analysisMode} risk identification...`)
+    const partyContext = selectedParty ? ` from the perspective of "${selectedParty.name}"` : ''
+    console.log(`Starting ${firstCategoryOnly ? 'first-category-only' : analysisMode} risk identification${partyContext}...`)
 
     try {
       // Identify risks across selected categories
-      const riskIdentification = await identifyRisks(text, analysisMode, firstCategoryOnly)
+      const riskIdentification = await identifyRisks(text, analysisMode, firstCategoryOnly, selectedParty)
       
       if (!riskIdentification.risks || riskIdentification.risks.length === 0) {
         return NextResponse.json({

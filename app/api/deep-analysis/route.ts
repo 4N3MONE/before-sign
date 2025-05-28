@@ -177,7 +177,7 @@ async function callSolarLLM(messages: SolarLLMMessage[], jsonSchema?: any): Prom
   }
 }
 
-async function performDeepAnalysis(riskId: string, title: string, description: string, originalText: string): Promise<any> {
+async function performDeepAnalysis(riskId: string, title: string, description: string, originalText: string, selectedParty: any = null): Promise<any> {
   const schema = {
     type: "object",
     properties: {
@@ -199,22 +199,27 @@ async function performDeepAnalysis(riskId: string, title: string, description: s
     required: ["businessImpact", "recommendations", "suggestedNewText"]
   }
 
+  const partyContext = selectedParty 
+    ? ` from the perspective of "${selectedParty.name}" (${selectedParty.description})` 
+    : ''
+
   const messages: SolarLLMMessage[] = [
     {
       role: "system",
-      content: `You are a contract advisor. Provide quick, practical suggestions to fix contract risks. Be concise and focus on actionable changes. IMPORTANT: Always write the suggested replacement text in the same language as the original text provided by the user.`
+      content: `You are a contract advisor${partyContext}. Provide quick, practical suggestions to fix contract risks${selectedParty ? ` that could negatively impact "${selectedParty.name}"` : ''}. Be concise and focus on actionable changes that protect${selectedParty ? ` "${selectedParty.name}"'s interests` : ' the client\'s interests'}. IMPORTANT: Always write the suggested replacement text in the same language as the original text provided by the user.`
     },
     {
       role: "user",
-      content: `Fix this contract risk:
+      content: `Fix this contract risk${selectedParty ? ` for "${selectedParty.name}"` : ''}:
 
 **Risk:** ${title}
 **Original Text:** "${originalText}"
+${selectedParty ? `**Client:** ${selectedParty.name} (${selectedParty.description})` : ''}
 
 Provide:
-1. Brief business impact (1 sentence)
-2. 2-3 practical actions to fix it (with priority: high/medium/low and effort: low/medium/high)
-3. Suggested replacement text (MUST be in the same language as the original text)
+1. Brief business impact${selectedParty ? ` specifically for "${selectedParty.name}"` : ''} (1 sentence)
+2. 2-3 practical actions to fix it${selectedParty ? ` to protect "${selectedParty.name}"` : ''} (with priority: high/medium/low and effort: low/medium/high)
+3. Suggested replacement text that better protects${selectedParty ? ` "${selectedParty.name}"` : ' the client'} (MUST be in the same language as the original text)
 
 Be concise and practical.`
     }
@@ -226,7 +231,7 @@ Be concise and practical.`
 
 export async function POST(req: Request) {
   try {
-    const { riskId, title, description, originalText } = await req.json()
+    const { riskId, title, description, originalText, selectedParty = null } = await req.json()
 
     if (!riskId || !title) {
       return NextResponse.json({ error: "Risk ID and title are required" }, { status: 400 })
@@ -236,10 +241,10 @@ export async function POST(req: Request) {
     llmCallCount = 0
     totalLLMTime = 0
 
-    console.log(`Starting deep analysis for risk: ${riskId}`)
+    console.log(`Starting deep analysis for risk: ${riskId}${selectedParty ? ` (for ${selectedParty.name})` : ''}`)
 
     try {
-      const analysis = await performDeepAnalysis(riskId, title, description, originalText || "")
+      const analysis = await performDeepAnalysis(riskId, title, description, originalText || "", selectedParty)
 
       console.log(`Deep analysis completed for risk: ${riskId} in ${totalLLMTime}ms with ${llmCallCount} LLM calls`)
       return NextResponse.json({

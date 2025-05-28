@@ -17,6 +17,14 @@ interface Recommendation {
   effort: "low" | "medium" | "high"
 }
 
+interface Party {
+  id: string
+  name: string
+  description: string
+  type: 'individual' | 'company' | 'organization' | 'other'
+  aliases?: string[]
+}
+
 interface Risk {
   id: string
   title: string
@@ -105,7 +113,7 @@ const sortRisksBySeverityAndSection = (risks: Risk[]): Risk[] => {
 
 export default function BeforeSignApp() {
   const { t } = useTranslation()
-  const [currentStep, setCurrentStep] = useState<"upload" | "parsing" | "identifying" | "results">("upload")
+  const [currentStep, setCurrentStep] = useState<"upload" | "parsing" | "party-selection" | "identifying" | "results">("upload")
 
   // Helper function to translate category names
   const translateCategory = (category: string): string => {
@@ -144,6 +152,12 @@ export default function BeforeSignApp() {
   const [isSharing, setIsSharing] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [showShareSuccess, setShowShareSuccess] = useState(false)
+
+  // Party selection state
+  const [parsedContent, setParsedContent] = useState<string | null>(null)
+  const [identifiedParties, setIdentifiedParties] = useState<Party[]>([])
+  const [selectedParty, setSelectedParty] = useState<Party | null>(null)
+  const [isIdentifyingParties, setIsIdentifyingParties] = useState(false)
 
   const createDiffText = (originalText: string, suggestedText: string): string => {
     if (!originalText || !suggestedText) return ""
@@ -264,7 +278,8 @@ export default function BeforeSignApp() {
         body: JSON.stringify({ 
           text: contractText,
           existingRisks: existingRisks,
-          categoryIndex: categoryIndex
+          categoryIndex: categoryIndex,
+          selectedParty: selectedParty
         }),
         signal: controller.signal
       })
@@ -485,7 +500,8 @@ export default function BeforeSignApp() {
             riskId: risk.id,
             title: risk.title,
             description: risk.description,
-            originalText: risk.originalText
+            originalText: risk.originalText,
+            selectedParty: selectedParty
           }),
           signal: controller.signal
         })
@@ -623,107 +639,60 @@ export default function BeforeSignApp() {
       }
 
       setIsUploading(false)
+      setParsedContent(uploadResult.parsedContent.text)
 
-      // Step 2: Identify initial risks
-      setCurrentStep("identifying")
-      
-      // Simulate identification progress
-      let identifyProgress = 0
-      const identifyInterval = setInterval(() => {
-        identifyProgress += Math.random() * 20 + 10
-        if (identifyProgress >= 85) {
-          identifyProgress = 85
+      // Step 2: Identify parties in the contract
+      setCurrentStep("party-selection")
+      setIsIdentifyingParties(true)
+
+      try {
+        const partiesResponse = await fetch('/api/identify-parties', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            text: uploadResult.parsedContent.text
+          }),
+        })
+
+        if (!partiesResponse.ok) {
+          throw new Error('Failed to identify parties')
         }
-        setIdentifyProgress(identifyProgress)
-      }, 400)
 
-      // Step 2a: Get the first critical category (LIABILITY) for immediate results
-      const firstCategoryResponse = await fetch('/api/identify-risks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          text: uploadResult.parsedContent.text,
-          firstCategoryOnly: true  // Only analyze LIABILITY for immediate results
-        }),
-      })
-
-      if (!firstCategoryResponse.ok) {
-        throw new Error('Failed to identify initial risks')
-      }
-
-      const firstCategoryRisks = await firstCategoryResponse.json()
-
-      // Update progress with current category
-      if (firstCategoryRisks.currentProgress) {
-        setCurrentProgress(firstCategoryRisks.currentProgress)
-      }
-      
-      // Update LLM stats
-      if (firstCategoryRisks.llmStats) {
-        setLlmStats(prev => ({
-          ...prev,
-          totalCalls: prev.totalCalls + firstCategoryRisks.llmStats.calls,
-          totalTime: prev.totalTime + firstCategoryRisks.llmStats.totalTime,
-          identifyTime: prev.identifyTime + firstCategoryRisks.llmStats.totalTime
-        }))
-      }
-
-      clearInterval(identifyInterval)
-      setIdentifyProgress(100)
-      
-      // Step 3: Show initial results IMMEDIATELY (no delay)
-      const initialRisks = firstCategoryRisks.risks.map((risk: Risk) => ({
-        ...risk,
-        isAnalyzing: false,
-        analysisComplete: false
-      }))
-      
-      setAnalysisResult({
-        totalRisks: firstCategoryRisks.risks.length,
-        risks: sortRisksBySeverityAndSection(initialRisks),
-        summary: firstCategoryRisks.summary || "Initial liability analysis complete. Analyzing remaining categories...",
-        analysisComplete: false
-      })
-      setCurrentStep("results")
-
-      // Start background analysis for remaining categories if there are more
-      // BUT DON'T start deep analysis yet - wait for all risk identification to complete
-      if (firstCategoryRisks.hasMoreCategories) {
-        setIsGettingRemainingRisks(true)
-        setCategoryProgress({ current: 1, total: 5, currentCategory: "Starting..." })
+        const partiesResult = await partiesResponse.json()
         
-        // Set up a timeout to detect if analysis gets stuck
-        const timeout = setTimeout(() => {
-          console.error('Category analysis appears stuck, showing error...')
-          setConfigError('Analysis appears to be stuck. This may be due to API issues. Please try again.')
-          setIsGettingRemainingRisks(false)
-          setCategoryProgress({ current: 0, total: 5, currentCategory: "" })
-        }, 300000) // 5 minute timeout
-        
-        setStuckTimeout(timeout)
-        
-        // Start with categoryIndex 0 for remaining categories (TERMINATION, PAYMENT, etc.)
-        getNextCategoryRisks(uploadResult.parsedContent.text, firstCategoryRisks.risks, 0)
-          .then(() => {
-            // Clear timeout when done
-            if (stuckTimeout) {
-              clearTimeout(stuckTimeout)
-              setStuckTimeout(null)
-            }
-          })
-          .catch((error) => {
-            console.error('Category analysis failed:', error)
-            if (stuckTimeout) {
-              clearTimeout(stuckTimeout)
-              setStuckTimeout(null)
-            }
-          })
-      } else {
-        // If no more categories, start deep analysis immediately
-        console.log('No more categories, starting deep analysis immediately for', firstCategoryRisks.risks.length, 'risks')
-        performDeepAnalysis(firstCategoryRisks.risks)
+        if (partiesResult.llmStats) {
+          setLlmStats(prev => ({
+            ...prev,
+            totalCalls: prev.totalCalls + partiesResult.llmStats.calls,
+            totalTime: prev.totalTime + partiesResult.llmStats.totalTime
+          }))
+        }
+
+        setIdentifiedParties(partiesResult.parties || [])
+        setIsIdentifyingParties(false)
+
+      } catch (error) {
+        console.error('Error identifying parties:', error)
+        setIsIdentifyingParties(false)
+        // Provide fallback parties if identification fails
+        setIdentifiedParties([
+          {
+            id: 'party1',
+            name: 'First Party',
+            description: 'Unable to automatically identify - please review contract manually',
+            type: 'other',
+            aliases: []
+          },
+          {
+            id: 'party2', 
+            name: 'Second Party',
+            description: 'Unable to automatically identify - please review contract manually',
+            type: 'other',
+            aliases: []
+          }
+        ])
       }
 
     } catch (error) {
@@ -828,6 +797,128 @@ export default function BeforeSignApp() {
     }
   }
 
+  const startRiskAnalysis = async () => {
+    if (!parsedContent) return
+    
+    setCurrentStep("identifying")
+    
+    // Simulate identification progress
+    let identifyProgress = 0
+    const identifyInterval = setInterval(() => {
+      identifyProgress += Math.random() * 20 + 10
+      if (identifyProgress >= 85) {
+        identifyProgress = 85
+      }
+      setIdentifyProgress(identifyProgress)
+    }, 400)
+
+    try {
+      // Step 3: Get the first critical category (LIABILITY) for immediate results with party context
+      const firstCategoryResponse = await fetch('/api/identify-risks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          text: parsedContent,
+          firstCategoryOnly: true,  // Only analyze LIABILITY for immediate results
+          selectedParty: selectedParty
+        }),
+      })
+
+      if (!firstCategoryResponse.ok) {
+        throw new Error('Failed to identify initial risks')
+      }
+
+      const firstCategoryRisks = await firstCategoryResponse.json()
+
+      // Update progress with current category
+      if (firstCategoryRisks.currentProgress) {
+        setCurrentProgress(firstCategoryRisks.currentProgress)
+      }
+      
+      // Update LLM stats
+      if (firstCategoryRisks.llmStats) {
+        setLlmStats(prev => ({
+          ...prev,
+          totalCalls: prev.totalCalls + firstCategoryRisks.llmStats.calls,
+          totalTime: prev.totalTime + firstCategoryRisks.llmStats.totalTime,
+          identifyTime: prev.identifyTime + firstCategoryRisks.llmStats.totalTime
+        }))
+      }
+
+      clearInterval(identifyInterval)
+      setIdentifyProgress(100)
+      
+      // Step 4: Show initial results IMMEDIATELY (no delay)
+      const initialRisks = firstCategoryRisks.risks.map((risk: Risk) => ({
+        ...risk,
+        isAnalyzing: false,
+        analysisComplete: false
+      }))
+      
+      setAnalysisResult({
+        totalRisks: firstCategoryRisks.risks.length,
+        risks: sortRisksBySeverityAndSection(initialRisks),
+        summary: firstCategoryRisks.summary || "Initial liability analysis complete. Analyzing remaining categories...",
+        analysisComplete: false
+      })
+      setCurrentStep("results")
+
+      // Start background analysis for remaining categories if there are more
+      // BUT DON'T start deep analysis yet - wait for all risk identification to complete
+      if (firstCategoryRisks.hasMoreCategories) {
+        setIsGettingRemainingRisks(true)
+        setCategoryProgress({ current: 1, total: 5, currentCategory: "Starting..." })
+        
+        // Set up a timeout to detect if analysis gets stuck
+        const timeout = setTimeout(() => {
+          console.error('Category analysis appears stuck, showing error...')
+          setConfigError('Analysis appears to be stuck. This may be due to API issues. Please try again.')
+          setIsGettingRemainingRisks(false)
+          setCategoryProgress({ current: 0, total: 5, currentCategory: "" })
+        }, 300000) // 5 minute timeout
+        
+        setStuckTimeout(timeout)
+        
+        // Start with categoryIndex 0 for remaining categories (TERMINATION, PAYMENT, etc.)
+        getNextCategoryRisks(parsedContent, firstCategoryRisks.risks, 0)
+          .then(() => {
+            // Clear timeout when done
+            if (stuckTimeout) {
+              clearTimeout(stuckTimeout)
+              setStuckTimeout(null)
+            }
+          })
+          .catch((error) => {
+            console.error('Category analysis failed:', error)
+            if (stuckTimeout) {
+              clearTimeout(stuckTimeout)
+              setStuckTimeout(null)
+            }
+          })
+      } else {
+        // If no more categories, start deep analysis immediately
+        console.log('No more categories, starting deep analysis immediately for', firstCategoryRisks.risks.length, 'risks')
+        performDeepAnalysis(firstCategoryRisks.risks)
+      }
+
+    } catch (error) {
+      console.error('Error:', error)
+      clearInterval(identifyInterval)
+      setCurrentStep("party-selection")
+      
+      // Check if it's an API key configuration error
+      if (error instanceof Error && error.message.includes('UPSTAGE_API_KEY')) {
+        setConfigError('API configuration missing. Please set up the UPSTAGE_API_KEY environment variable.')
+      } else if (error instanceof Error && error.message.includes('API key')) {
+        setConfigError('API key error. Please check your UPSTAGE_API_KEY configuration.')
+      } else {
+        setConfigError('An error occurred while analyzing risks. Please try again.')
+      }
+    }
+  }
+
   const resetApp = () => {
     setCurrentStep("upload")
     setUploadedFile(null)
@@ -860,6 +951,11 @@ export default function BeforeSignApp() {
     setIsSharing(false)
     setShareUrl(null)
     setShowShareSuccess(false)
+    // Clear party state
+    setParsedContent(null)
+    setIdentifiedParties([])
+    setSelectedParty(null)
+    setIsIdentifyingParties(false)
   }
 
   const handleShareReport = async () => {
@@ -875,7 +971,8 @@ export default function BeforeSignApp() {
         body: JSON.stringify({
           analysisResult,
           fileName: uploadedFile.name,
-          llmStats
+          llmStats,
+          selectedParty
         }),
       })
 
@@ -1107,6 +1204,135 @@ export default function BeforeSignApp() {
     )
   }
 
+  if (currentStep === "party-selection") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Select Your Party</h1>
+              <p className="text-gray-600">{uploadedFile?.name}</p>
+            </div>
+            <Button variant="outline" onClick={resetApp}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Upload
+            </Button>
+          </div>
+
+          {isIdentifyingParties ? (
+            <Card className="max-w-lg mx-auto">
+              <CardHeader className="text-center">
+                <CardTitle className="text-xl">Analyzing Contract Parties</CardTitle>
+                <CardDescription>Identifying all parties involved in this contract...</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex justify-center">
+                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+                </div>
+
+                <div className="text-center text-sm text-gray-600">
+                  <p>Using AI to identify contract parties and their roles</p>
+                  <p className="mt-1">This helps us provide analysis from your perspective</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Target className="h-5 w-5 mr-2 text-blue-600" />
+                    Choose Your Perspective
+                  </CardTitle>
+                  <CardDescription>
+                    Select which party you represent in this contract. The risk analysis will be tailored to identify risks that could negatively impact your interests.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4">
+                    {identifiedParties.map((party) => (
+                      <div
+                        key={party.id}
+                        className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                          selectedParty?.id === party.id
+                            ? 'border-blue-500 bg-blue-50 shadow-md'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                        onClick={() => setSelectedParty(party)}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className="text-lg font-medium text-gray-900">{party.name}</h3>
+                              <Badge variant="outline" className="text-xs">
+                                {party.type}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-2">{party.description}</p>
+                            {party.aliases && party.aliases.length > 0 && (
+                              <div className="text-xs text-gray-500">
+                                Also known as: {party.aliases.join(', ')}
+                              </div>
+                            )}
+                          </div>
+                          <div className="ml-4">
+                            {selectedParty?.id === party.id ? (
+                              <CheckCircle className="h-6 w-6 text-blue-600" />
+                            ) : (
+                              <div className="h-6 w-6 rounded-full border-2 border-gray-300"></div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-amber-50 border-amber-200">
+                <CardContent className="p-4">
+                  <div className="flex items-start">
+                    <Lightbulb className="h-5 w-5 text-amber-600 mr-3 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="font-medium text-amber-900 mb-1">Why does this matter?</h4>
+                      <p className="text-sm text-amber-800">
+                        Contract risks are subjective. A clause that protects one party might expose the other to liability. 
+                        By selecting your party, we can identify risks specifically relevant to your position and interests.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="flex justify-center">
+                <Button 
+                  onClick={startRiskAnalysis}
+                  disabled={!selectedParty}
+                  size="lg"
+                  className="min-w-48"
+                >
+                  {selectedParty 
+                    ? `Analyze Risks for ${selectedParty.name}`
+                    : 'Select a Party to Continue'
+                  }
+                </Button>
+              </div>
+
+              {configError && (
+                <Alert className="bg-red-50 border-red-200">
+                  <AlertTriangle className="h-4 w-4 text-red-600" />
+                  <AlertDescription className="text-red-800">
+                    <strong>Configuration Error:</strong> {configError}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   if (currentStep === "identifying") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center">
@@ -1154,7 +1380,14 @@ export default function BeforeSignApp() {
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">{t('results.title')}</h1>
+              <h1 className="text-3xl font-bold text-gray-900">
+                {t('results.title')}
+                {selectedParty && (
+                  <span className="text-xl font-normal text-blue-600 ml-2">
+                    for {selectedParty.name}
+                  </span>
+                )}
+              </h1>
               <p className="text-gray-600">{uploadedFile?.name}</p>
             </div>
             <div className="flex gap-2">
@@ -1238,6 +1471,34 @@ export default function BeforeSignApp() {
                 </div>
               </AlertDescription>
             </Alert>
+          )}
+
+          {/* Party Perspective Information */}
+          {selectedParty && (
+            <Card className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center">
+                    <Target className="h-6 w-6 text-blue-600 mr-3 flex-shrink-0 mt-1" />
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                        Analysis Perspective: {selectedParty.name}
+                      </h3>
+                      <p className="text-sm text-gray-700 mb-2">{selectedParty.description}</p>
+                      <div className="flex items-center">
+                        <Badge variant="outline" className="text-xs mr-2">
+                          {selectedParty.type}
+                        </Badge>
+                        <span className="text-xs text-gray-500">
+                          This analysis identifies risks that could negatively impact {selectedParty.name}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <Shield className="h-8 w-8 text-blue-600 opacity-20" />
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
@@ -1506,6 +1767,11 @@ export default function BeforeSignApp() {
                       <h4 className="font-medium mb-2 flex items-center">
                         <Target className="h-4 w-4 mr-2 text-orange-600" />
                         {t('risk.businessImpact')}
+                        {selectedParty && (
+                          <span className="text-xs text-gray-500 ml-2">
+                            (for {selectedParty.name})
+                          </span>
+                        )}
                       </h4>
                       <p className="text-gray-700">{risk.businessImpact}</p>
                     </div>
@@ -1516,6 +1782,11 @@ export default function BeforeSignApp() {
                       <h4 className="font-medium mb-3 flex items-center">
                         <Lightbulb className="h-4 w-4 mr-2 text-green-600" />
                         {t('risk.recommendedActions')}
+                        {selectedParty && (
+                          <span className="text-xs text-gray-500 ml-2">
+                            (to protect {selectedParty.name})
+                          </span>
+                        )}
                       </h4>
                       <div className="space-y-3">
                         {risk.recommendations.map((rec, idx) => (
