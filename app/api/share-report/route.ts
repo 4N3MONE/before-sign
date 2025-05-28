@@ -11,7 +11,8 @@ export async function POST(request: NextRequest) {
     const { 
       analysisResult, 
       fileName, 
-      llmStats 
+      llmStats,
+      selectedParty 
     } = body;
 
     // Validate required data
@@ -41,6 +42,7 @@ export async function POST(request: NextRequest) {
         summary: analysisResult.summary,
         analysisComplete: analysisResult.analysisComplete
       },
+      selectedParty: selectedParty || null,
       llmStats: llmStats || {
         totalCalls: 0,
         totalTime: 0,

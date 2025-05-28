@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
-import { AlertTriangle, CheckCircle, Lightbulb, FileText, BookOpen, Target, Brain, Globe, ArrowLeft } from "lucide-react"
+import { AlertTriangle, CheckCircle, Lightbulb, FileText, BookOpen, Target, Brain, Globe, ArrowLeft, Shield } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -34,10 +34,19 @@ interface AnalysisResult {
   analysisComplete: boolean
 }
 
+interface Party {
+  id: string
+  name: string
+  description: string
+  type: 'individual' | 'company' | 'organization' | 'other'
+  aliases?: string[]
+}
+
 interface SharedReport {
   shareId: string
   fileName: string
   analysisResult: AnalysisResult
+  selectedParty: Party | null
   llmStats: {
     totalCalls: number
     totalTime: number
@@ -252,7 +261,14 @@ export default function SharedReportPage() {
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Contract Risk Analysis Report</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Contract Risk Analysis Report
+              {report.selectedParty && (
+                <span className="text-xl font-normal text-blue-600 ml-2">
+                  for {report.selectedParty.name}
+                </span>
+              )}
+            </h1>
             <p className="text-gray-600">{report.fileName}</p>
             <p className="text-sm text-gray-500">
               Shared on {new Date(report.createdAt).toLocaleDateString()} • 
@@ -277,6 +293,34 @@ export default function SharedReportPage() {
             It will automatically expire on {new Date(report.expiresAt).toLocaleDateString()}.
           </AlertDescription>
         </Alert>
+
+        {/* Party Perspective Information */}
+        {report.selectedParty && (
+          <Card className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center">
+                  <Target className="h-6 w-6 text-blue-600 mr-3 flex-shrink-0 mt-1" />
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                      Analysis Perspective: {report.selectedParty.name}
+                    </h3>
+                    <p className="text-sm text-gray-700 mb-2">{report.selectedParty.description}</p>
+                    <div className="flex items-center">
+                      <Badge variant="outline" className="text-xs mr-2">
+                        {report.selectedParty.type}
+                      </Badge>
+                      <span className="text-xs text-gray-500">
+                        This analysis identifies risks that could negatively impact {report.selectedParty.name}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <Shield className="h-8 w-8 text-blue-600 opacity-20" />
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
           <Card>
@@ -399,6 +443,11 @@ export default function SharedReportPage() {
                     <h4 className="font-medium mb-2 flex items-center">
                       <Target className="h-4 w-4 mr-2 text-orange-600" />
                       Business Impact
+                      {report.selectedParty && (
+                        <span className="text-xs text-gray-500 ml-2">
+                          (for {report.selectedParty.name})
+                        </span>
+                      )}
                     </h4>
                     <p className="text-gray-700">{risk.businessImpact}</p>
                   </div>
@@ -409,6 +458,11 @@ export default function SharedReportPage() {
                     <h4 className="font-medium mb-3 flex items-center">
                       <Lightbulb className="h-4 w-4 mr-2 text-green-600" />
                       Recommended Actions
+                      {report.selectedParty && (
+                        <span className="text-xs text-gray-500 ml-2">
+                          (to protect {report.selectedParty.name})
+                        </span>
+                      )}
                     </h4>
                     <div className="space-y-3">
                       {risk.recommendations.map((rec, idx) => (

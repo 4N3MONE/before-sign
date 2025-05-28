@@ -152,6 +152,7 @@ export default function BeforeSignApp() {
   const [isSharing, setIsSharing] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [showShareSuccess, setShowShareSuccess] = useState(false)
+  const [showCopySuccess, setShowCopySuccess] = useState(false)
 
   // Party selection state
   const [parsedContent, setParsedContent] = useState<string | null>(null)
@@ -951,6 +952,7 @@ export default function BeforeSignApp() {
     setIsSharing(false)
     setShareUrl(null)
     setShowShareSuccess(false)
+    setShowCopySuccess(false)
     // Clear party state
     setParsedContent(null)
     setIdentifiedParties([])
@@ -984,10 +986,14 @@ export default function BeforeSignApp() {
 
       const data = await response.json()
       setShareUrl(data.shareUrl)
+      
+      // Automatically copy the URL to clipboard
+      const copySuccess = await copyUrlToClipboard(data.shareUrl)
+      
       setShowShareSuccess(true)
       
-      // Hide success message after 3 seconds
-      setTimeout(() => setShowShareSuccess(false), 3000)
+      // Hide success message after 5 seconds (longer since there are now two success states)
+      setTimeout(() => setShowShareSuccess(false), 5000)
     } catch (error) {
       console.error('Error sharing report:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
@@ -1005,25 +1011,36 @@ export default function BeforeSignApp() {
     }
   }
 
-  const copyShareUrl = async () => {
-    if (!shareUrl) return
-    
+  // Helper function to copy URL to clipboard
+  const copyUrlToClipboard = async (url: string) => {
     try {
-      await navigator.clipboard.writeText(shareUrl)
-      setShowShareSuccess(true)
-      setTimeout(() => setShowShareSuccess(false), 2000)
+      await navigator.clipboard.writeText(url)
+      setShowCopySuccess(true)
+      setTimeout(() => setShowCopySuccess(false), 2000)
+      return true
     } catch (error) {
       console.error('Failed to copy URL:', error)
       // Fallback for older browsers
-      const textArea = document.createElement('textarea')
-      textArea.value = shareUrl
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-      setShowShareSuccess(true)
-      setTimeout(() => setShowShareSuccess(false), 2000)
+      try {
+        const textArea = document.createElement('textarea')
+        textArea.value = url
+        document.body.appendChild(textArea)
+        textArea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textArea)
+        setShowCopySuccess(true)
+        setTimeout(() => setShowCopySuccess(false), 2000)
+        return true
+      } catch (fallbackError) {
+        console.error('Fallback copy method also failed:', fallbackError)
+        return false
+      }
     }
+  }
+
+  const copyShareUrl = async () => {
+    if (!shareUrl) return
+    await copyUrlToClipboard(shareUrl)
   }
 
   if (currentStep === "upload") {
@@ -1441,31 +1458,39 @@ export default function BeforeSignApp() {
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <strong>Report shared successfully!</strong>
+                    {showCopySuccess && (
+                      <span className="ml-2 text-green-700 font-medium">📋 Link copied to clipboard!</span>
+                    )}
                     <p className="text-sm mt-1">
                       Anyone with this link can view the analysis results. The link will expire in 30 days.
+                      {showCopySuccess && (
+                        <span className="block text-green-700 font-medium mt-1">
+                          ✓ The link has been automatically copied to your clipboard.
+                        </span>
+                      )}
                     </p>
                     <div className="mt-2 flex items-center gap-2">
                       <code className="bg-green-100 px-2 py-1 rounded text-sm text-green-800 flex-1 truncate">
                         {shareUrl}
                       </code>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={copyShareUrl}
-                        className="border-green-300 text-green-700 hover:bg-green-100"
-                      >
-                        {showShareSuccess ? (
-                          <>
-                            <Check className="h-3 w-3 mr-1" />
-                            Copied!
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3 w-3 mr-1" />
-                            Copy
-                          </>
-                        )}
-                      </Button>
+                                    <Button 
+                size="sm" 
+                variant="outline"
+                onClick={copyShareUrl}
+                className="border-green-300 text-green-700 hover:bg-green-100"
+              >
+                {showCopySuccess ? (
+                  <>
+                    <Check className="h-3 w-3 mr-1" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3 w-3 mr-1" />
+                    Copy
+                  </>
+                )}
+              </Button>
                     </div>
                   </div>
                 </div>
