@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { AuthProvider } from '@/lib/auth-context'
 import '@/lib/i18n' // Initialize i18n
 
 interface ClientWrapperProps {
@@ -38,5 +39,9 @@ export default function ClientWrapper({ children }: ClientWrapperProps) {
     )
   }
 
-  return <>{children}</>
+  return (
+    <AuthProvider>
+      {children}
+    </AuthProvider>
+  )
 } 

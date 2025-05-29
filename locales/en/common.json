@@ -50,14 +50,15 @@
     "minorConcerns": "Minor concerns"
   },
   "analysis": {
-    "findingMoreRisks": "Finding more risks...",
-    "currentlyAnalyzing": "Currently analyzing: {category}",
-    "category": "Category {current}/{total}",
-    "newRisksWillAppear": "New risks will appear automatically.",
-    "analyzingRemaining": "Analyzing remaining risk categories. New risks will appear automatically.",
-    "connectionIssues": "Connection issues detected, retrying...",
+    "findingMoreRisks": "Finding more risks",
+    "findingAdditionalRisks": "Finding additional risks",
+    "connectionIssues": "Experiencing network delays, please wait...",
+    "currentlyAnalyzing": "Currently analyzing {{category}}",
+    "category": "{{current}}/{{total}}",
+    "newRisksWillAppear": "New risks will appear below",
+    "analyzingRemaining": "Finding additional risks in other categories...",
     "allRisksIdentified": "All risks identified!",
-    "deepAnalysisProgress": "Now performing deep analysis... Currently analyzing: Risk {current}/{total}",
+    "deepAnalysisProgress": "Analyzing risk {{current}} of {{total}}",
     "retrying": "Retrying... ({current}/{total})"
   },
   "risk": {
@@ -122,8 +123,13 @@
   "categories": {
     "LIABILITY": "Liability",
     "TERMINATION": "Termination",
+    "TERMINATION AND RENEWAL": "Termination and Renewal",
     "PAYMENT": "Payment",
+    "PAYMENT AND FINANCIAL": "Payment and Financial",
     "INTELLECTUAL_PROPERTY": "Intellectual Property",
+    "INTELLECTUAL PROPERTY": "Intellectual Property",
+    "PERFORMANCE AND COMPLIANCE": "Performance and Compliance",
+    "DISPUTE RESOLUTION": "Dispute Resolution",
     "COMPLIANCE": "Compliance",
     "Starting...": "Starting...",
     "Category 1": "Category 1",

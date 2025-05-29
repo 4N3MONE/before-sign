@@ -177,6 +177,44 @@ async function callSolarLLM(messages: SolarLLMMessage[], jsonSchema?: any): Prom
   }
 }
 
+// Utility function to parse LLM response and extract thinking process
+const parseLLMResponse = (rawResponse: string) => {
+  let thinking = null
+  let cleanContent = rawResponse
+
+  // Extract thinking process if present
+  const thinkMatch = rawResponse.match(/<think>([\s\S]*?)<\/think>/)
+  if (thinkMatch) {
+    thinking = thinkMatch[1].trim()
+    cleanContent = rawResponse.replace(/<think>[\s\S]*?<\/think>/, '').trim()
+  }
+
+  // Try to parse JSON from clean content
+  let parsedContent = null
+  try {
+    // Look for JSON block
+    const jsonMatch = cleanContent.match(/```json\s*([\s\S]*?)\s*```/) || 
+                     cleanContent.match(/\{[\s\S]*\}/)
+    
+    if (jsonMatch) {
+      const jsonStr = jsonMatch[1] || jsonMatch[0]
+      parsedContent = JSON.parse(jsonStr)
+    } else if (cleanContent.startsWith('{') && cleanContent.endsWith('}')) {
+      parsedContent = JSON.parse(cleanContent)
+    }
+  } catch (error) {
+    console.warn('Failed to parse JSON from LLM response:', error)
+    // Return null if JSON parsing fails
+    return { thinking, parsedContent: null, rawContent: cleanContent }
+  }
+
+  return {
+    thinking,
+    parsedContent,
+    rawContent: cleanContent
+  }
+}
+
 async function performDeepAnalysis(riskId: string, title: string, description: string, originalText: string, selectedParty: any = null): Promise<any> {
   const schema = {
     type: "object",
@@ -226,7 +264,20 @@ Be concise and practical.`
   ]
 
   const content = await callSolarLLM(messages, schema)
-  return JSON.parse(content)
+  
+  // Parse the response to extract thinking process
+  const parsed = parseLLMResponse(content)
+  
+  if (parsed.parsedContent) {
+    // Return the parsed JSON with thinking process
+    return {
+      ...parsed.parsedContent,
+      thinking: parsed.thinking
+    }
+  } else {
+    // Fallback to direct JSON parsing if our parser failed
+    return JSON.parse(content)
+  }
 }
 
 export async function POST(req: Request) {

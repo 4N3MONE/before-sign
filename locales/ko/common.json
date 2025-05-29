@@ -50,14 +50,15 @@
     "minorConcerns": "경미한 우려사항"
   },
   "analysis": {
-    "findingMoreRisks": "더 많은 위험을 찾는 중...",
-    "currentlyAnalyzing": "현재 분석 중: {category}",
-    "category": "카테고리 {current}/{total}",
-    "newRisksWillAppear": "새로운 위험이 자동으로 나타납니다.",
-    "analyzingRemaining": "남은 위험 카테고리를 분석하는 중입니다. 새로운 위험이 자동으로 나타납니다.",
-    "connectionIssues": "연결 문제가 감지되었습니다. 재시도 중...",
-    "allRisksIdentified": "모든 위험이 식별되었습니다!",
-    "deepAnalysisProgress": "이제 심층 분석을 수행하는 중... 현재 분석: 위험 {current}/{total}",
+    "findingMoreRisks": "추가 위험 요소 탐색 중",
+    "findingAdditionalRisks": "추가 위험 요소 탐색 중",
+    "connectionIssues": "네트워크 지연 발생, 잠시만 기다려 주세요...",
+    "currentlyAnalyzing": "{{category}} 분석 중",
+    "category": "{{current}}/{{total}}",
+    "newRisksWillAppear": "새로운 위험 요소가 자동으로 표시됩니다",
+    "analyzingRemaining": "다른 카테고리의 추가 위험 요소를 찾는 중...",
+    "allRisksIdentified": "모든 위험 요소 식별 완료!",
+    "deepAnalysisProgress": "위험 요소 {{current}}/{{total}} 분석 중",
     "retrying": "재시도 중... ({current}/{total})"
   },
   "risk": {
@@ -122,8 +123,13 @@
   "categories": {
     "LIABILITY": "책임",
     "TERMINATION": "계약 종료",
+    "TERMINATION AND RENEWAL": "계약 종료 및 갱신",
     "PAYMENT": "지불",
+    "PAYMENT AND FINANCIAL": "지불 및 재정",
     "INTELLECTUAL_PROPERTY": "지적 재산권",
+    "INTELLECTUAL PROPERTY": "지적 재산권",
+    "PERFORMANCE AND COMPLIANCE": "성과 및 규정 준수",
+    "DISPUTE RESOLUTION": "분쟁 해결",
     "COMPLIANCE": "규정 준수",
     "Starting...": "시작 중...",
     "Category 1": "카테고리 1",

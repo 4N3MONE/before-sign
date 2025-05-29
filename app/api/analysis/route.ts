@@ -313,42 +313,37 @@ export async function POST(req: Request) {
           totalRisks: 0,
           risks: [],
           summary: riskIdentification.summary || "No significant risks identified in this contract.",
-          analysisComplete: true
+          analysisComplete: false
         })
       }
 
-      // Step 2: Analyze each risk in detail with recommendations
-      console.log(`Step 2: Analyzing ${riskIdentification.risks.length} risks in detail...`)
-      const detailedAnalyses = await Promise.all(
-        riskIdentification.risks.map(risk => analyzeRiskInDetail(risk, text))
-      )
+      // Format basic risks for immediate display (no deep analysis yet)
+      const basicRisks = riskIdentification.risks.map((risk, index) => ({
+        id: `risk_${Date.now()}_${index}`,
+        title: risk.title,
+        severity: risk.severity,
+        description: `${risk.riskType} risk identified in ${risk.location}`,
+        originalText: risk.originalText,
+        location: risk.location,
+        riskType: risk.riskType,
+        isAnalyzing: false,
+        analysisComplete: false
+      }))
 
-      // Format the response
       const analysisResult = {
-        totalRisks: detailedAnalyses.length,
-        risks: detailedAnalyses.map(analysis => ({
-          id: analysis.id,
-          title: analysis.title,
-          severity: analysis.severity,
-          description: analysis.detailedExplanation,
-          originalText: analysis.originalText,
-          businessImpact: analysis.businessImpact,
-          legalRisks: analysis.legalRisks,
-          recommendations: analysis.recommendations,
-          suggestedNewText: analysis.suggestedNewText,
-          location: analysis.location
-        })),
-        summary: riskIdentification.summary,
-        analysisComplete: true
+        totalRisks: basicRisks.length,
+        risks: basicRisks,
+        summary: riskIdentification.summary + " Additional risks are being identified...",
+        analysisComplete: false
       }
 
-      console.log("Analysis completed successfully")
+      console.log(`Risk identification completed: ${basicRisks.length} risks found`)
       return NextResponse.json(analysisResult)
       
     } catch (analysisError) {
-      console.error("Error during LLM analysis:", analysisError)
+      console.error("Error during risk identification:", analysisError)
       
-      // Provide fallback mock data that demonstrates the new structure
+      // Provide fallback mock data for risk identification only
       const fallbackAnalysis = {
         totalRisks: 3,
         risks: [
@@ -356,101 +351,38 @@ export async function POST(req: Request) {
             id: "fallback_1",
             title: "Unlimited Liability Exposure",
             severity: "high" as const,
-            description: "This contract contains an unlimited liability clause that could expose your organization to significant financial risk beyond the scope of the agreement.",
+            description: "Liability risk identified in Section 8: Liability and Indemnification",
             originalText: "The Service Provider shall be liable for all damages, losses, costs, and expenses of any kind arising from or relating to this Agreement, without limitation.",
-            businessImpact: "Could result in unlimited financial exposure far exceeding the contract value, potentially threatening business viability in case of disputes or claims.",
-            legalRisks: [
-              "Exposure to punitive damages beyond actual losses",
-              "Potential liability for consequential and indirect damages",
-              "No cap on financial exposure regardless of contract value"
-            ],
-            recommendations: [
-              {
-                action: "Add liability cap limiting damages to contract value or annual fees paid",
-                priority: "high" as const,
-                effort: "low" as const
-              },
-              {
-                action: "Exclude consequential and indirect damages from liability",
-                priority: "high" as const,
-                effort: "low" as const
-              },
-              {
-                action: "Include mutual liability limitations for both parties",
-                priority: "medium" as const,
-                effort: "medium" as const
-              }
-            ],
-            suggestedNewText: "The Service Provider's liability under this Agreement shall be limited to the total amount paid by the Client in the twelve (12) months preceding the claim, and shall exclude any consequential, indirect, or punitive damages.",
-            location: "Section 8: Liability and Indemnification"
+            location: "Section 8: Liability and Indemnification",
+            riskType: "Liability",
+            isAnalyzing: false,
+            analysisComplete: false
           },
           {
             id: "fallback_2",
             title: "Automatic Renewal Without Notice",
             severity: "medium" as const,
-            description: "The contract automatically renews for additional terms without requiring explicit consent or providing adequate notice period for termination.",
+            description: "Termination risk identified in Section 3: Term and Termination",
             originalText: "This Agreement shall automatically renew for successive one-year periods unless terminated by either party with thirty (30) days written notice prior to the renewal date.",
-            businessImpact: "Risk of being locked into unfavorable terms or pricing without opportunity to renegotiate. Short notice period may result in inadvertent renewals.",
-            legalRisks: [
-              "Binding commitment to potentially outdated terms",
-              "Insufficient time to evaluate contract performance",
-              "Limited opportunity for competitive bidding"
-            ],
-            recommendations: [
-              {
-                action: "Change to opt-in renewal requiring affirmative action",
-                priority: "medium" as const,
-                effort: "low" as const
-              },
-              {
-                action: "Extend notice period to 90 days for adequate planning",
-                priority: "medium" as const,
-                effort: "low" as const
-              },
-              {
-                action: "Include right to renegotiate terms upon each renewal",
-                priority: "low" as const,
-                effort: "medium" as const
-              }
-            ],
-            suggestedNewText: "This Agreement shall expire at the end of the initial term unless both parties agree in writing to renew. Either party may provide written notice of non-renewal at least ninety (90) days prior to expiration.",
-            location: "Section 3: Term and Termination"
+            location: "Section 3: Term and Termination",
+            riskType: "Termination",
+            isAnalyzing: false,
+            analysisComplete: false
           },
           {
             id: "fallback_3",
             title: "Broad Indemnification Requirements",
             severity: "medium" as const,
-            description: "The indemnification clause requires you to protect the other party from claims that may not be directly related to your performance under the contract.",
+            description: "Indemnification risk identified in Section 9: Indemnification",
             originalText: "Client agrees to indemnify, defend, and hold harmless Provider from and against any and all claims, demands, losses, costs, and expenses arising out of or relating to Client's use of the services or any third-party claims.",
-            businessImpact: "Potential responsibility for costs and damages beyond your control, including Provider's own negligent acts or third-party intellectual property claims unrelated to your actions.",
-            legalRisks: [
-              "Liability for Provider's negligent or wrongful acts",
-              "Exposure to third-party IP claims beyond your control",
-              "Unlimited indemnification scope"
-            ],
-            recommendations: [
-              {
-                action: "Limit indemnification to claims arising from your breach or negligence",
-                priority: "high" as const,
-                effort: "low" as const
-              },
-              {
-                action: "Add mutual indemnification for respective breaches",
-                priority: "medium" as const,
-                effort: "medium" as const
-              },
-              {
-                action: "Exclude indemnification for Provider's gross negligence or willful misconduct",
-                priority: "high" as const,
-                effort: "low" as const
-              }
-            ],
-            suggestedNewText: "Each party shall indemnify the other for third-party claims arising solely from such party's breach of this Agreement or negligent acts, excluding any claims arising from the other party's gross negligence or willful misconduct.",
-            location: "Section 9: Indemnification"
+            location: "Section 9: Indemnification",
+            riskType: "Indemnification",
+            isAnalyzing: false,
+            analysisComplete: false
           }
         ],
-        summary: "The contract contains several areas requiring attention, including unlimited liability exposure, automatic renewal terms, and broad indemnification requirements. These issues could result in significant financial and legal risks.",
-        analysisComplete: true
+        summary: "Initial risk identification complete. Found 3 risks requiring attention. Additional risks are being identified...",
+        analysisComplete: false
       }
       
       return NextResponse.json(fallbackAnalysis)

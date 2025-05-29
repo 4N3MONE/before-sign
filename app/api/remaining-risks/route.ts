@@ -65,7 +65,7 @@ async function callSolarLLM(messages: SolarLLMMessage[], jsonSchema?: any): Prom
     model: modelName,
     messages: messages,
     temperature: 0.1,
-    max_tokens: 4000,
+    max_tokens: 3500,
     top_p: 0.9,
   }
 
@@ -257,7 +257,19 @@ Be thorough - find every potential risk, no matter how small.`
   ]
 
   const content = await callSolarLLM(messages, schema)
-  return JSON.parse(content)
+  
+  try {
+    return JSON.parse(content)
+  } catch (parseError) {
+    console.error(`JSON parsing failed for category ${category}:`, parseError)
+    console.log('Raw content that failed to parse:', content.substring(0, 500) + '...')
+    
+    // Return empty result but preserve category for progress tracking
+    return {
+      risks: [],
+      summary: `${category} analysis encountered a parsing error but was attempted.`
+    }
+  }
 }
 
 // Simple text similarity function to detect duplicates
@@ -291,7 +303,7 @@ function levenshteinDistance(str1: string, str2: string): number {
   return matrix[str2.length][str1.length]
 }
 
-async function getNextCategoryRisks(contractText: string, existingRiskTexts: string[], categoryIndex: number = 0, selectedParty: any = null): Promise<RiskIdentificationResult & { llmStats: { calls: number; totalTime: number }; categoryAnalyzed: string; hasMoreCategories: boolean; nextCategoryIndex: number }> {
+async function getNextCategoryRisks(contractText: string, existingRiskTexts: string[], categoryIndex: number = 0, selectedParty: any = null): Promise<RiskIdentificationResult & { llmStats: { calls: number; totalTime: number }; categoryAnalyzed: string; hasMoreCategories: boolean; nextCategoryIndex: number; totalCategories: number }> {
   // Reset counters for new analysis
   llmCallCount = 0
   totalLLMTime = 0
@@ -359,7 +371,8 @@ async function getNextCategoryRisks(contractText: string, existingRiskTexts: str
       llmStats: { calls: 0, totalTime: 0 },
       categoryAnalyzed: "",
       hasMoreCategories: false,
-      nextCategoryIndex: categoryIndex
+      nextCategoryIndex: categoryIndex,
+      totalCategories: remainingCategories.length
     }
   }
 
@@ -391,7 +404,8 @@ async function getNextCategoryRisks(contractText: string, existingRiskTexts: str
       },
       categoryAnalyzed: category,
       hasMoreCategories: categoryIndex + 1 < remainingCategories.length,
-      nextCategoryIndex: categoryIndex + 1
+      nextCategoryIndex: categoryIndex + 1,
+      totalCategories: remainingCategories.length
     }
     
   } catch (error) {
@@ -403,7 +417,8 @@ async function getNextCategoryRisks(contractText: string, existingRiskTexts: str
       llmStats: { calls: llmCallCount, totalTime: totalLLMTime },
       categoryAnalyzed: category,
       hasMoreCategories: categoryIndex + 1 < remainingCategories.length,
-      nextCategoryIndex: categoryIndex + 1
+      nextCategoryIndex: categoryIndex + 1,
+      totalCategories: remainingCategories.length
     }
   }
 }
@@ -442,7 +457,8 @@ export async function POST(req: Request) {
         llmStats: categoryRisks.llmStats,
         categoryAnalyzed: categoryRisks.categoryAnalyzed,
         hasMoreCategories: categoryRisks.hasMoreCategories,
-        nextCategoryIndex: categoryRisks.nextCategoryIndex
+        nextCategoryIndex: categoryRisks.nextCategoryIndex,
+        totalCategories: categoryRisks.totalCategories
       })
       
     } catch (analysisError) {
@@ -471,7 +487,8 @@ export async function POST(req: Request) {
         llmStats: { calls: 0, totalTime: 0 },
         categoryAnalyzed: currentCategory,
         hasMoreCategories: categoryIndex + 1 < fallbackCategories.length,
-        nextCategoryIndex: categoryIndex + 1
+        nextCategoryIndex: categoryIndex + 1,
+        totalCategories: fallbackCategories.length
       })
     }
 

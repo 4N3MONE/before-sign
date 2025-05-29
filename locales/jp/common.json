@@ -122,8 +122,13 @@
   "categories": {
     "LIABILITY": "責任",
     "TERMINATION": "契約終了",
+    "TERMINATION AND RENEWAL": "契約終了と更新",
     "PAYMENT": "支払い",
+    "PAYMENT AND FINANCIAL": "支払いと財務",
     "INTELLECTUAL_PROPERTY": "知的財産権",
+    "INTELLECTUAL PROPERTY": "知的財産権",
+    "PERFORMANCE AND COMPLIANCE": "パフォーマンスとコンプライアンス",
+    "DISPUTE RESOLUTION": "紛争解決",
     "COMPLIANCE": "コンプライアンス",
     "Starting...": "開始中...",
     "Category 1": "カテゴリー 1",
