@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback } from "react"
-import { Upload, FileText, AlertTriangle, CheckCircle, Lightbulb, ArrowLeft, BookOpen, Shield, Target, Clock, Brain, Globe, Share2, Copy, Check, ChevronDown, ChevronUp, User } from "lucide-react"
+import { Upload, FileText, AlertTriangle, CheckCircle, Lightbulb, ArrowLeft, BookOpen, Shield, Target, Clock, Brain, Globe, Share2, Copy, Check, ChevronDown, ChevronUp, User, Trash2 } from "lucide-react"
 import { useTranslation } from 'react-i18next'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -267,6 +267,7 @@ export default function BeforeSignApp() {
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [showShareSuccess, setShowShareSuccess] = useState(false)
   const [showCopySuccess, setShowCopySuccess] = useState(false)
+  const [isDeletingShare, setIsDeletingShare] = useState(false)
 
   // Party selection state
   const [parsedContent, setParsedContent] = useState<string | null>(null)
@@ -290,6 +291,36 @@ export default function BeforeSignApp() {
   const [currentHtmlContent, setCurrentHtmlContent] = useState<string | null>(null)
   const [hasAutoSaved, setHasAutoSaved] = useState(false)
   const [showAutoSaveSuccess, setShowAutoSaveSuccess] = useState(false)
+
+  // 🔥 NEW: Background analysis state - separate from displayed content
+  const [backgroundAnalysis, setBackgroundAnalysis] = useState<{
+    documentId: string | null
+    isRunning: boolean
+    step: 'identifying' | 'category-analysis' | 'deep-analysis' | 'complete'
+    parsedContent: string | null
+    selectedParty: Party | null
+    currentAnalysisResult: AnalysisResult | null
+    fileName: string | null
+    htmlContent: string | null
+    categoryProgress: { current: number, total: number, currentCategory: string }
+    deepAnalysisProgress: { current: number, total: number }
+    currentAnalyzingRisk: string | null
+  }>({
+    documentId: null,
+    isRunning: false,
+    step: 'identifying',
+    parsedContent: null,
+    selectedParty: null,
+    currentAnalysisResult: null,
+    fileName: null,
+    htmlContent: null,
+    categoryProgress: { current: 0, total: 0, currentCategory: "" },
+    deepAnalysisProgress: { current: 0, total: 0 },
+    currentAnalyzingRisk: null
+  })
+
+  // 🔥 NEW: Track if currently displayed document is being analyzed in background
+  const isDisplayedDocumentBeingAnalyzed = selectedDocumentId === backgroundAnalysis.documentId && backgroundAnalysis.isRunning
 
   const createDiffText = (originalText: string, suggestedText: string): string => {
     if (!originalText || !suggestedText) return ""
@@ -373,8 +404,14 @@ export default function BeforeSignApp() {
   }
 
   const updateRiskAnalysis = useCallback((riskId: string, updatedRisk: Partial<Risk>) => {
+    // 🔥 NEW: Update both displayed state and background analysis state as needed
+    
+    // Always update displayed analysis result if it has this risk
     setAnalysisResult(prev => {
       if (!prev) return prev
+      
+      const hasRisk = prev.risks.some(risk => risk.id === riskId)
+      if (!hasRisk) return prev
       
       const updatedRisks = prev.risks.map(risk => 
         risk.id === riskId 
@@ -390,13 +427,44 @@ export default function BeforeSignApp() {
         risks: sortedRisks
       }
     })
+    
+    // 🔥 NEW: Also update background analysis state if this risk belongs to background analysis
+    setBackgroundAnalysis(prev => {
+      if (!prev.currentAnalysisResult) return prev
+      
+      const hasRisk = prev.currentAnalysisResult.risks.some(risk => risk.id === riskId)
+      if (!hasRisk) return prev
+      
+      const updatedRisks = prev.currentAnalysisResult.risks.map(risk => 
+        risk.id === riskId 
+          ? { ...risk, ...updatedRisk }
+          : risk
+      )
+      
+      const sortedRisks = sortRisksBySeverityAndSection(updatedRisks)
+      
+      return {
+        ...prev,
+        currentAnalysisResult: {
+          ...prev.currentAnalysisResult,
+          risks: sortedRisks
+        }
+      }
+    })
   }, [])
 
-  const getNextCategoryRisks = async (contractText: string, existingRisks: Risk[], categoryIndex: number = 0, retryCount: number = 0) => {
+  const getNextCategoryRisks = async (contractText: string, existingRisks: Risk[], categoryIndex: number = 0, retryCount: number = 0, targetDocumentId?: string) => {
     const maxRetries = 3
     
+    // 🔥 NEW: Determine if this is background analysis or current display analysis
+    const isBackgroundAnalysis = targetDocumentId && targetDocumentId !== selectedDocumentId
+    
     try {
-      console.log(`Getting category risks for index ${categoryIndex}, attempt ${retryCount + 1}/${maxRetries + 1}`)
+      console.log(`Getting category risks for index ${categoryIndex}, attempt ${retryCount + 1}/${maxRetries + 1}`, {
+        isBackgroundAnalysis,
+        targetDocumentId,
+        currentSelectedDocumentId: selectedDocumentId
+      })
       
       // Add timeout to the fetch request
       const controller = new AbortController()
@@ -411,7 +479,7 @@ export default function BeforeSignApp() {
           text: contractText,
           existingRisks: existingRisks,
           categoryIndex: categoryIndex,
-          selectedParty: selectedParty
+          selectedParty: isBackgroundAnalysis ? backgroundAnalysis.selectedParty : selectedParty
         }),
         signal: controller.signal
       })
@@ -424,7 +492,8 @@ export default function BeforeSignApp() {
           categoryAnalyzed: categoryRisks.categoryAnalyzed,
           risksFound: categoryRisks.risks?.length || 0,
           hasMoreCategories: categoryRisks.hasMoreCategories,
-          nextCategoryIndex: categoryRisks.nextCategoryIndex
+          nextCategoryIndex: categoryRisks.nextCategoryIndex,
+          isBackgroundAnalysis
         })
         
         // Update LLM stats
@@ -437,196 +506,193 @@ export default function BeforeSignApp() {
           }))
         }
         
-        // Update category progress
-        if (categoryRisks.categoryAnalyzed) {
-          setCategoryProgress({
-            current: categoryIndex + 1,
-            total: categoryRisks.totalCategories || 5, // Use dynamic total with fallback
-            currentCategory: categoryRisks.categoryAnalyzed
-          })
-          console.log(`Updated category progress: ${categoryIndex + 1}/${categoryRisks.totalCategories || 5} - ${categoryRisks.categoryAnalyzed}`)
+        // 🔥 NEW: Update appropriate progress state based on analysis type
+        const newCategoryProgress = {
+          current: categoryIndex + 1,
+          total: categoryRisks.totalCategories || 5,
+          currentCategory: categoryRisks.categoryAnalyzed || `Category ${categoryIndex + 1}`
+        }
+        
+        if (isBackgroundAnalysis) {
+          // Update background analysis progress
+          setBackgroundAnalysis(prev => ({
+            ...prev,
+            categoryProgress: newCategoryProgress
+          }))
         } else {
-          console.warn(`No categoryAnalyzed in response:`, categoryRisks)
-          setCategoryProgress({
-            current: categoryIndex + 1,
-            total: categoryRisks.totalCategories || 5, // Use dynamic total with fallback
-            currentCategory: `Category ${categoryIndex + 1}`
-          })
+          // Update displayed progress
+          setCategoryProgress(newCategoryProgress)
         }
         
         let allRisks: Risk[] = []
         
-        // Add new risks to existing analysis result IMMEDIATELY
+        // 🔥 NEW: Handle risk updates for appropriate analysis state
         if (categoryRisks.risks && categoryRisks.risks.length > 0) {
-          setAnalysisResult(prev => {
-            if (prev) {
-              const updatedRisks = [...prev.risks, ...categoryRisks.risks]
-              const sortedRisks = sortRisksBySeverityAndSection(updatedRisks)
-              const newAnalysisResult = {
-                ...prev,
-                totalRisks: sortedRisks.length,
-                risks: sortedRisks,
-                summary: `Found ${sortedRisks.length} total risks so far. Continuing analysis...`
-              }
-              
-              // 🔥 IMMEDIATE DATABASE UPDATE: Push updated risk count to database
-              if (user && selectedDocumentId) {
-                console.log('🔥 Immediately updating database with new risks:', {
-                  categoryAnalyzed: categoryRisks.categoryAnalyzed,
-                  newRisksFound: categoryRisks.risks.length,
-                  totalRisksNow: sortedRisks.length,
-                  previousTotal: prev.totalRisks
-                })
-                
-                const progressResult = {
-                  ...newAnalysisResult,
-                  summary: `Found ${sortedRisks.length} risks so far. ${categoryRisks.categoryAnalyzed} analysis complete.`,
-                  isAnalyzing: true,
-                  analysisComplete: false
+          if (isBackgroundAnalysis) {
+            // Update background analysis state
+            setBackgroundAnalysis(prev => {
+              if (prev.currentAnalysisResult) {
+                const updatedRisks = [...prev.currentAnalysisResult.risks, ...categoryRisks.risks]
+                const sortedRisks = sortRisksBySeverityAndSection(updatedRisks)
+                const updatedAnalysisResult = {
+                  ...prev.currentAnalysisResult,
+                  totalRisks: sortedRisks.length,
+                  risks: sortedRisks,
+                  summary: `Found ${sortedRisks.length} total risks so far. Continuing analysis...`
                 }
                 
-                // Update database immediately (no setTimeout)
-                DocumentService.updateDocumentAnalysis(selectedDocumentId, progressResult)
-                  .then(() => {
-                    console.log('✅ Database updated immediately with new risk count:', sortedRisks.length)
+                // Save to database immediately for background analysis
+                if (user && targetDocumentId) {
+                  console.log('🔄 Updating background analysis in database:', {
+                    categoryAnalyzed: categoryRisks.categoryAnalyzed,
+                    newRisksFound: categoryRisks.risks.length,
+                    totalRisksNow: sortedRisks.length
                   })
-                  .catch(error => {
-                    console.error('❌ Failed to update database with category results:', error)
-                  })
-              }
-              
-              return newAnalysisResult
-            }
-            return prev
-          })
-          
-          // 🔄 PROGRESSIVE UPDATE: Save after each category completion
-          if (user && selectedDocumentId) {
-            console.log('🔄 Updating document after category completion:', categoryProgress.currentCategory, {
-              newRisksFound: categoryRisks.risks.length,
-              totalRisksNow: categoryRisks.risks.length + allRisks.length
-            })
-            
-            setTimeout(async () => {
-              try {
-                // Get the current analysis result to save
-                const currentAnalysisResult = analysisResult
-                if (currentAnalysisResult) {
+                  
                   const progressResult = {
-                    ...currentAnalysisResult,
-                    totalRisks: allRisks.length + categoryRisks.risks.length,
-                    risks: [...allRisks, ...categoryRisks.risks],
-                    summary: `Found ${allRisks.length + categoryRisks.risks.length} risks so far. Analyzing ${categoryProgress.currentCategory} complete.`,
+                    ...updatedAnalysisResult,
+                    summary: `Found ${sortedRisks.length} risks so far. ${categoryRisks.categoryAnalyzed} analysis complete.`,
                     isAnalyzing: true,
                     analysisComplete: false
                   }
                   
-                  await DocumentService.updateDocumentAnalysis(selectedDocumentId, progressResult)
-                  console.log('✅ Document updated with category results')
-                  
-                  // Real-time Firestore listener will automatically update sidebar
+                  DocumentService.updateDocumentAnalysis(targetDocumentId, progressResult)
+                    .then(() => {
+                      console.log('✅ Background analysis updated in database')
+                    })
+                    .catch(error => {
+                      console.error('❌ Failed to update background analysis in database:', error)
+                    })
                 }
-              } catch (error) {
-                console.error('❌ Failed to update document after category:', error)
+                
+                return {
+                  ...prev,
+                  currentAnalysisResult: updatedAnalysisResult
+                }
               }
-            }, 500)
+              return prev
+            })
+          } else {
+            // Update displayed analysis state (existing logic)
+            setAnalysisResult(prev => {
+              if (prev) {
+                const updatedRisks = [...prev.risks, ...categoryRisks.risks]
+                const sortedRisks = sortRisksBySeverityAndSection(updatedRisks)
+                const newAnalysisResult = {
+                  ...prev,
+                  totalRisks: sortedRisks.length,
+                  risks: sortedRisks,
+                  summary: `Found ${sortedRisks.length} total risks so far. Continuing analysis...`
+                }
+                
+                // Update database if this is also the selected document
+                if (user && selectedDocumentId) {
+                  const progressResult = {
+                    ...newAnalysisResult,
+                    summary: `Found ${sortedRisks.length} risks so far. ${categoryRisks.categoryAnalyzed} analysis complete.`,
+                    isAnalyzing: true,
+                    analysisComplete: false
+                  }
+                  
+                  DocumentService.updateDocumentAnalysis(selectedDocumentId, progressResult)
+                    .then(() => {
+                      console.log('✅ Displayed analysis updated in database')
+                    })
+                    .catch(error => {
+                      console.error('❌ Failed to update displayed analysis in database:', error)
+                    })
+                }
+                
+                return newAnalysisResult
+              }
+              return prev
+            })
           }
-        } else {
-          // Even if no new risks found, we still need to get all risks
-          setAnalysisResult(prev => {
-            if (prev) {
-              allRisks = prev.risks
-              // Update summary even if no risks found, but maintain current sorting
-              return {
-                ...prev,
-                risks: sortRisksBySeverityAndSection(prev.risks), // Re-sort in case location info was updated
-                summary: `${prev.summary} ${categoryRisks.summary}.`
-              }
-            }
-            return prev
-          })
         }
         
         // Check if there are more categories to analyze
         if (categoryRisks.hasMoreCategories) {
           // Continue with next category
           console.log(`Continuing with next category (${categoryRisks.nextCategoryIndex})...`)
-          console.log(`Current allRisks count: ${allRisks.length}`)
-          await getNextCategoryRisks(contractText, allRisks, categoryRisks.nextCategoryIndex)
+          await getNextCategoryRisks(contractText, allRisks, categoryRisks.nextCategoryIndex, 0, targetDocumentId)
         } else {
           console.log('All categories completed! Finalizing risk identification...')
-          // All categories done - update summary and start deep analysis
-          setAnalysisResult(prev => {
-            if (!prev) return prev
-            return {
-              ...prev,
-              summary: `Found ${prev.totalRisks} total risks. Now analyzing each risk in detail...`
-            }
-          })
           
-          setIsGettingRemainingRisks(false)
-          setCategoryProgress({ current: 0, total: 0, currentCategory: "" })
-          
-          // Save the complete risk identification results for logged-in users
-          if (user && selectedDocumentId) {
-            console.log('Saving final completed analysis results...')
+          // 🔥 NEW: Handle completion for appropriate analysis state
+          if (isBackgroundAnalysis) {
+            // Update background analysis completion
+            setBackgroundAnalysis(prev => {
+              if (prev.currentAnalysisResult) {
+                const finalResult = {
+                  ...prev.currentAnalysisResult,
+                  summary: `Found ${prev.currentAnalysisResult.totalRisks} total risks. Now analyzing each risk in detail...`
+                }
+                
+                // Start deep analysis for background
+                setTimeout(() => {
+                  if (prev.currentAnalysisResult) {
+                    performBackgroundDeepAnalysis(prev.currentAnalysisResult.risks, targetDocumentId!)
+                  }
+                }, 100)
+                
+                return {
+                  ...prev,
+                  step: 'deep-analysis' as const,
+                  currentAnalysisResult: finalResult,
+                  categoryProgress: { current: 0, total: 0, currentCategory: "" }
+                }
+              }
+              return prev
+            })
+          } else {
+            // Update displayed analysis completion (existing logic)
+            setAnalysisResult(prev => {
+              if (!prev) return prev
+              return {
+                ...prev,
+                summary: `Found ${prev.totalRisks} total risks. Now analyzing each risk in detail...`
+              }
+            })
             
-            // Small delay to ensure state is updated
-            setTimeout(async () => {
-              try {
-                await saveCurrentDocument()
-                console.log('Final analysis results saved successfully')
-                setShowAutoSaveSuccess(true)
-                setTimeout(() => setShowAutoSaveSuccess(false), 5000)
-              } catch (error) {
-                console.error('Final save failed:', error)
+            setIsGettingRemainingRisks(false)
+            setCategoryProgress({ current: 0, total: 0, currentCategory: "" })
+            
+            // Start deep analysis for displayed content
+            setAnalysisResult(prev => {
+              if (prev && prev.risks.length > 0) {
+                performDeepAnalysis(prev.risks)
               }
-            }, 1000)
+              return prev
+            })
           }
-          
-          // Clear the stuck timeout since we completed successfully
-          if (stuckTimeout) {
-            clearTimeout(stuckTimeout)
-            setStuckTimeout(null)
-          }
-          
-          // NOW start deep analysis for ALL risks since risk identification is complete
-          console.log('All risk identification complete. Starting deep analysis for', allRisks.length, 'risks...')
-          
-          // Get the current risks from state to ensure we have the latest
-          setAnalysisResult(prev => {
-            if (prev && prev.risks.length > 0) {
-              console.log('Starting deep analysis with', prev.risks.length, 'risks from state')
-              performDeepAnalysis(prev.risks)
-            } else {
-              console.log('No risks found in state, using allRisks:', allRisks.length)
-              if (allRisks.length > 0) {
-                performDeepAnalysis(allRisks)
-              }
-            }
-            return prev
-          })
         }
       } else {
-        // Handle non-OK responses
+        // Handle non-OK responses (existing error handling logic)
         const errorText = await response.text()
         console.error(`API /remaining-risks failed with status ${response.status}:`, errorText)
         
-        // Check if it's an API key error
         if (response.status === 401 || errorText.includes('UPSTAGE_API_KEY')) {
           setConfigError('API configuration error. Please check your UPSTAGE_API_KEY.')
-          setIsGettingRemainingRisks(false)
-          setCategoryProgress({ current: 0, total: 0, currentCategory: "" })
+          if (isBackgroundAnalysis) {
+            setBackgroundAnalysis(prev => ({ ...prev, isRunning: false }))
+          } else {
+            setIsGettingRemainingRisks(false)
+            setCategoryProgress({ current: 0, total: 0, currentCategory: "" })
+          }
           return
         }
         
-        // Retry for other errors
+        // Retry logic
         if (retryCount < maxRetries) {
           console.log(`Retrying category risks in 2 seconds... (${retryCount + 1}/${maxRetries})`)
-          setRetryStatus(`Retrying... (${retryCount + 1}/${maxRetries})`)
+          if (!isBackgroundAnalysis) {
+            setRetryStatus(`Retrying... (${retryCount + 1}/${maxRetries})`)
+          }
           await new Promise(resolve => setTimeout(resolve, 2000))
-          setRetryStatus(null)
-          return getNextCategoryRisks(contractText, existingRisks, categoryIndex, retryCount + 1)
+          if (!isBackgroundAnalysis) {
+            setRetryStatus(null)
+          }
+          return getNextCategoryRisks(contractText, existingRisks, categoryIndex, retryCount + 1, targetDocumentId)
         } else {
           throw new Error(`API failed after ${maxRetries + 1} attempts: ${response.status} ${errorText}`)
         }
@@ -634,38 +700,223 @@ export default function BeforeSignApp() {
     } catch (error) {
       console.error('Failed to get category risks:', error)
       
-             // Check if it's a timeout or network error that we should retry
-       if (retryCount < maxRetries && (error instanceof Error && (error.name === 'AbortError' || error.message.includes('fetch')))) {
-         console.log(`Network error, retrying in 3 seconds... (${retryCount + 1}/${maxRetries})`)
-         setRetryStatus(`Network error, retrying... (${retryCount + 1}/${maxRetries})`)
-         await new Promise(resolve => setTimeout(resolve, 3000))
-         setRetryStatus(null)
-         return getNextCategoryRisks(contractText, existingRisks, categoryIndex, retryCount + 1)
-       }
+      // Handle retries and errors
+      if (retryCount < maxRetries && (error instanceof Error && (error.name === 'AbortError' || error.message.includes('fetch')))) {
+        console.log(`Network error, retrying in 3 seconds... (${retryCount + 1}/${maxRetries})`)
+        if (!isBackgroundAnalysis) {
+          setRetryStatus(`Network error, retrying... (${retryCount + 1}/${maxRetries})`)
+        }
+        await new Promise(resolve => setTimeout(resolve, 3000))
+        if (!isBackgroundAnalysis) {
+          setRetryStatus(null)
+        }
+        return getNextCategoryRisks(contractText, existingRisks, categoryIndex, retryCount + 1, targetDocumentId)
+      }
       
-             // Final failure - stop the process and show retry option
-       setIsGettingRemainingRisks(false)
-       setCategoryProgress({ current: 0, total: 0, currentCategory: "" })
-       
-       // Clear stuck timeout
-       if (stuckTimeout) {
-         clearTimeout(stuckTimeout)
-         setStuckTimeout(null)
-       }
-       
-       // Check if it's an API key error (don't offer retry for config issues)
-      if (error instanceof Error && (error.message.includes('UPSTAGE_API_KEY') || error.message.includes('API key'))) {
-        setConfigError('API configuration error. Please check your UPSTAGE_API_KEY.')
+      // Final failure handling
+      if (isBackgroundAnalysis) {
+        console.error('Background analysis failed:', error)
+        setBackgroundAnalysis(prev => ({ ...prev, isRunning: false }))
       } else {
-        // Set analysis error with retry option instead of config error
-        setAnalysisError({
-          type: 'category',
-          message: `Failed to complete risk identification after ${maxRetries + 1} attempts. You can retry the analysis or continue with the ${existingRisks.length} risks already found.`,
-          canRetry: true,
-          retryData: { contractText, existingRisks, categoryIndex }
-        })
+        setIsGettingRemainingRisks(false)
+        setCategoryProgress({ current: 0, total: 0, currentCategory: "" })
+        
+        if (stuckTimeout) {
+          clearTimeout(stuckTimeout)
+          setStuckTimeout(null)
+        }
+        
+        if (error instanceof Error && (error.message.includes('UPSTAGE_API_KEY') || error.message.includes('API key'))) {
+          setConfigError('API configuration error. Please check your UPSTAGE_API_KEY.')
+        } else {
+          setAnalysisError({
+            type: 'category',
+            message: `Failed to complete risk identification after ${maxRetries + 1} attempts. You can retry the analysis or continue with the ${existingRisks.length} risks already found.`,
+            canRetry: true,
+            retryData: { contractText, existingRisks, categoryIndex }
+          })
+        }
       }
     }
+  }
+
+  const performBackgroundDeepAnalysis = async (risks: Risk[], targetDocumentId: string) => {
+    console.log(`🔄 Starting background deep analysis for ${risks.length} risks in document ${targetDocumentId}...`)
+    
+    if (!risks || risks.length === 0) {
+      console.log('No risks to analyze in background')
+      setBackgroundAnalysis(prev => ({ ...prev, isRunning: false, step: 'complete' }))
+      return
+    }
+    
+    // Initialize background progress tracking
+    setBackgroundAnalysis(prev => ({
+      ...prev,
+      deepAnalysisProgress: { current: 0, total: risks.length },
+      currentAnalyzingRisk: null
+    }))
+    
+    for (let i = 0; i < risks.length; i++) {
+      const risk = risks[i]
+      console.log(`🔍 Background deep analyzing risk ${i + 1}/${risks.length}: ${risk.id} - ${risk.title}`)
+      
+      // Update background progress
+      setBackgroundAnalysis(prev => ({
+        ...prev,
+        deepAnalysisProgress: { current: i + 1, total: risks.length },
+        currentAnalyzingRisk: risk.id
+      }))
+      
+      // Mark this risk as being analyzed (this will update both states if needed)
+      updateRiskAnalysis(risk.id, { isAnalyzing: true })
+
+      try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 180000) // 3 minute timeout
+        
+        const response = await fetch('/api/deep-analysis', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            riskId: risk.id,
+            title: risk.title,
+            description: risk.description,
+            originalText: risk.originalText,
+            selectedParty: backgroundAnalysis.selectedParty
+          }),
+          signal: controller.signal
+        })
+
+        clearTimeout(timeoutId)
+
+        if (response.ok) {
+          const deepAnalysis = await response.json()
+          console.log(`Background deep analysis completed for ${risk.id}:`, deepAnalysis)
+          
+          // Parse the LLM response to extract thinking process
+          const parsed = parseLLMResponse(deepAnalysis)
+          const analysisData = parsed.parsedContent || deepAnalysis
+          
+          // Update with deep analysis results (this will update both states if needed)
+          updateRiskAnalysis(risk.id, {
+            description: analysisData.businessImpact || risk.description,
+            businessImpact: analysisData.businessImpact,
+            recommendations: analysisData.recommendations,
+            suggestedNewText: analysisData.suggestedNewText,
+            thinking: parsed.thinking || undefined,
+            isAnalyzing: false,
+            analysisComplete: true
+          })
+          
+          console.log(`Background risk ${risk.id} updated with analysis results`)
+        } else {
+          console.error(`Background deep analysis API failed for ${risk.id}:`, response.status, response.statusText)
+          
+          // Mark as complete even if analysis failed
+          updateRiskAnalysis(risk.id, { 
+            description: "Background analysis failed - please review manually",
+            isAnalyzing: false, 
+            analysisComplete: true,
+            businessImpact: "Background analysis failed - please review manually",
+            recommendations: [{
+              action: "Review this risk manually with legal counsel",
+              priority: "medium" as const,
+              effort: "medium" as const
+            }]
+          })
+        }
+      } catch (error) {
+        console.error('Background deep analysis failed for risk:', risk.id, error)
+        
+        const isTimeout = error instanceof Error && error.name === 'AbortError'
+        const errorMessage = isTimeout 
+          ? "Background analysis timed out - please review manually" 
+          : "Background network error during analysis - please review manually"
+        
+        updateRiskAnalysis(risk.id, { 
+          description: errorMessage,
+          isAnalyzing: false, 
+          analysisComplete: true,
+          businessImpact: errorMessage,
+          recommendations: [{
+            action: isTimeout 
+              ? "This background analysis timed out. Try again or review manually with legal counsel"
+              : "Review this risk manually with legal counsel",
+            priority: "medium" as const,
+            effort: "medium" as const
+          }],
+          suggestedNewText: "Please consult with legal counsel for appropriate replacement text."
+        })
+      }
+
+      // Small delay between analyses
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // Periodically save progress during background analysis
+      if ((i + 1) % 3 === 0) {
+        setTimeout(async () => {
+          try {
+            // Get current background analysis result and save it
+            const currentBackgroundResult = backgroundAnalysis.currentAnalysisResult
+            if (currentBackgroundResult && user) {
+              const progressResult = {
+                ...currentBackgroundResult,
+                summary: `Background analysis: ${i + 1}/${risks.length} risks analyzed in detail.`,
+                isAnalyzing: true,
+                analysisComplete: false
+              }
+              
+              await DocumentService.updateDocumentAnalysis(targetDocumentId, progressResult)
+              console.log(`✅ Background document updated after analyzing ${i + 1}/${risks.length} risks`)
+            }
+          } catch (error) {
+            console.error('❌ Failed to update background document during deep analysis:', error)
+          }
+        }, 100)
+      }
+      
+      console.log(`✅ Completed background deep analysis for risk ${i + 1}/${risks.length}: ${risk.id}`)
+    }
+
+    console.log('🎉 *** BACKGROUND DEEP ANALYSIS COMPLETED *** 🎉')
+    
+    // Update background analysis completion
+    setBackgroundAnalysis(prev => {
+      if (!prev.currentAnalysisResult) return prev
+      
+      const finalAnalysisResult = {
+        ...prev.currentAnalysisResult,
+        summary: `Background analysis complete! Found ${prev.currentAnalysisResult.totalRisks} risks with detailed recommendations.`,
+        analysisComplete: true,
+        isAnalyzing: false
+      }
+      
+      // Save final completion status to database
+      if (user) {
+        console.log('🔄 Saving final background analysis completion status to database...')
+        
+        setTimeout(() => {
+          DocumentService.updateDocumentAnalysis(targetDocumentId, finalAnalysisResult)
+            .then(() => {
+              console.log('🎉 *** BACKGROUND ANALYSIS COMPLETION SAVED TO DATABASE *** 🎉')
+            })
+            .catch(error => {
+              console.error('❌ Failed to save background analysis completion status:', error)
+            })
+        }, 200)
+      }
+      
+      return {
+        ...prev,
+        isRunning: false,
+        step: 'complete',
+        currentAnalysisResult: finalAnalysisResult,
+        currentAnalyzingRisk: null,
+        deepAnalysisProgress: { current: 0, total: 0 }
+      }
+    })
   }
 
   const performDeepAnalysis = async (risks: Risk[]) => {
@@ -1046,6 +1297,23 @@ export default function BeforeSignApp() {
         await DocumentService.updateDocumentAnalysis(selectedDocumentId, analyzingResult)
         console.log('✅ Document marked as analyzing')
         
+        // 🔥 NEW: Initialize background analysis state for this document
+        setBackgroundAnalysis({
+          documentId: selectedDocumentId,
+          isRunning: true,
+          step: 'identifying',
+          parsedContent: parsedContent,
+          selectedParty: selectedParty,
+          currentAnalysisResult: null,
+          fileName: uploadedFile?.name || 'Unknown',
+          htmlContent: currentHtmlContent,
+          categoryProgress: { current: 0, total: 0, currentCategory: "" },
+          deepAnalysisProgress: { current: 0, total: 0 },
+          currentAnalyzingRisk: null
+        })
+        
+        console.log('🔥 Background analysis state initialized for document:', selectedDocumentId)
+        
         // Real-time Firestore listener will automatically update sidebar
       } catch (error) {
         console.error('❌ Failed to mark document as analyzing:', error)
@@ -1111,6 +1379,13 @@ export default function BeforeSignApp() {
       setAnalysisResult(analysisResult)
       setCurrentStep("results") // Show results immediately!
 
+      // 🔥 NEW: Update background analysis state with initial results
+      setBackgroundAnalysis(prev => ({
+        ...prev,
+        currentAnalysisResult: analysisResult,
+        step: 'category-analysis'
+      }))
+
       // 🔄 IMMEDIATE UPDATE: Save initial risks to database for real-time sidebar updates
       if (user && selectedDocumentId) {
         console.log('🔄 Updating document with initial risks:', {
@@ -1164,7 +1439,7 @@ export default function BeforeSignApp() {
       setTimeout(async () => {
         // First, get additional risks from all categories
         setIsGettingRemainingRisks(true)
-        await getNextCategoryRisks(parsedContent, analysisResult.risks)
+        await getNextCategoryRisks(parsedContent, analysisResult.risks, 0, 0, selectedDocumentId || undefined)
         
         // After all risks are found, the getNextCategoryRisks will automatically start deep analysis
       }, 100) // Small delay to ensure UI is rendered
@@ -1269,13 +1544,26 @@ export default function BeforeSignApp() {
     })
     setShareUrl(null)
     setShowCopySuccess(false)
+    setShowShareSuccess(false)
+    setIsSharing(false)
+    setIsDeletingShare(false)
   }
 
   const handleShareReport = async () => {
-    if (!analysisResult || !uploadedFile) return
+    // 🔥 FIXED: Work with both new analysis and loaded historical documents
+    if (!analysisResult) return
+
+    // 🔗 NEW: Check if document is already shared
+    if (shareUrl) {
+      console.log('📋 Document already shared, showing existing share URL:', shareUrl)
+      return // Document is already shared, show existing URL
+    }
 
     setIsSharing(true)
     try {
+      // Use the document title from loaded document or filename from uploaded file
+      const documentName = uploadedFile?.name || 'Analysis Report'
+      
       const response = await fetch('/api/share-report', {
         method: 'POST',
         headers: {
@@ -1283,7 +1571,7 @@ export default function BeforeSignApp() {
         },
         body: JSON.stringify({
           analysisResult,
-          fileName: uploadedFile.name,
+          fileName: documentName,
           llmStats,
           selectedParty
         }),
@@ -1297,6 +1585,17 @@ export default function BeforeSignApp() {
 
       const data = await response.json()
       setShareUrl(data.shareUrl)
+      
+      // 🔗 NEW: Save share info to document if we have a selected document
+      if (user && selectedDocumentId) {
+        try {
+          await DocumentService.updateDocumentShareInfo(selectedDocumentId, data.shareId, data.shareUrl)
+          console.log('✅ Share info saved to document:', selectedDocumentId)
+        } catch (error) {
+          console.error('❌ Failed to save share info to document:', error)
+          // Don't fail the whole operation if this fails
+        }
+      }
       
       // Automatically copy the URL to clipboard
       const copySuccess = await copyUrlToClipboard(data.shareUrl)
@@ -1352,6 +1651,51 @@ export default function BeforeSignApp() {
   const copyShareUrl = async () => {
     if (!shareUrl) return
     await copyUrlToClipboard(shareUrl)
+  }
+
+  const deleteShareReport = async () => {
+    if (!shareUrl) return
+
+    setIsDeletingShare(true)
+    try {
+      // Extract share ID from URL
+      const shareId = shareUrl.split('/shared/')[1]
+      if (!shareId) {
+        throw new Error('Invalid share URL')
+      }
+
+      const response = await fetch(`/api/delete-shared-report/${shareId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.error || `Server error: ${response.status}`
+        throw new Error(errorMessage)
+      }
+
+      // 🔗 NEW: Remove share info from document if we have a selected document
+      if (user && selectedDocumentId) {
+        try {
+          await DocumentService.removeDocumentShareInfo(selectedDocumentId)
+          console.log('✅ Share info removed from document:', selectedDocumentId)
+        } catch (error) {
+          console.error('❌ Failed to remove share info from document:', error)
+          // Don't fail the whole operation if this fails
+        }
+      }
+
+      // Clear share URL and show success
+      setShareUrl(null)
+      setShowShareSuccess(false)
+      alert('Shared report deleted successfully')
+    } catch (error) {
+      console.error('Error deleting shared report:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      alert(`Failed to delete shared report: ${errorMessage}`)
+    } finally {
+      setIsDeletingShare(false)
+    }
   }
 
   // Document management functions
@@ -1481,9 +1825,18 @@ export default function BeforeSignApp() {
   }
 
   const loadDocument = async (documentId: string) => {
+    console.log('📂 Loading document:', documentId, {
+      isBackgroundAnalysisRunning: backgroundAnalysis.isRunning,
+      backgroundDocumentId: backgroundAnalysis.documentId,
+      currentSelectedDocumentId: selectedDocumentId
+    })
+    
     try {
       const document = await DocumentService.getDocument(documentId)
       if (document) {
+        // 🔥 NEW: Don't interrupt background analysis - just switch what's displayed
+        console.log('✅ Document loaded, switching display without interrupting background analysis')
+        
         setSelectedDocumentId(documentId)
         setAnalysisResult(document.analysisResult)
         setCurrentHtmlContent(document.htmlContent)
@@ -1492,6 +1845,42 @@ export default function BeforeSignApp() {
         // Create a mock file object for display purposes
         const mockFile = new File([], document.fileName, { type: 'application/pdf' })
         setUploadedFile(mockFile)
+        
+        // Clear any displayed progress states since we're showing a completed document
+        setIsGettingRemainingRisks(false)
+        setCurrentAnalyzingRisk(null)
+        setDeepAnalysisProgress({ current: 0, total: 0 })
+        setCategoryProgress({ current: 0, total: 0, currentCategory: "" })
+        
+        // 🔗 NEW: Restore share state if document was previously shared
+        if (document.shareInfo) {
+          console.log('🔗 Restoring share state from document:', {
+            shareId: document.shareInfo.shareId,
+            shareUrl: document.shareInfo.shareUrl,
+            sharedAt: document.shareInfo.sharedAt
+          })
+          setShareUrl(document.shareInfo.shareUrl)
+          setShowShareSuccess(true) // Show that it's already shared
+          setShowCopySuccess(false)
+          setIsSharing(false)
+          setIsDeletingShare(false)
+        } else {
+          // Clear share state for documents that haven't been shared
+          setShareUrl(null)
+          setShowShareSuccess(false)
+          setShowCopySuccess(false)
+          setIsSharing(false)
+          setIsDeletingShare(false)
+        }
+        
+        console.log('🎯 Document display switched to:', documentId, {
+          totalRisks: document.analysisResult?.totalRisks,
+          analysisComplete: document.analysisResult?.analysisComplete,
+          backgroundStillRunning: backgroundAnalysis.isRunning ? 'Yes' : 'No',
+          backgroundDocumentId: backgroundAnalysis.documentId,
+          hasShareInfo: !!document.shareInfo,
+          shareUrl: document.shareInfo?.shareUrl
+        })
       }
     } catch (error) {
       console.error('Error loading document:', error)
@@ -1907,9 +2296,8 @@ export default function BeforeSignApp() {
                     disabled={
                       isSharing || 
                       !analysisResult || 
-                      isGettingRemainingRisks || 
-                      currentAnalyzingRisk !== null ||
-                      (analysisResult && analysisResult.risks.some(risk => risk.isAnalyzing))
+                      !analysisResult.analysisComplete ||
+                      (isDisplayedDocumentBeingAnalyzed && (isGettingRemainingRisks || currentAnalyzingRisk !== null))
                     }
                     className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
                   >
@@ -1921,13 +2309,13 @@ export default function BeforeSignApp() {
                     ) : (
                       <>
                         <Share2 className="h-4 w-4 mr-2" />
-                        {isGettingRemainingRisks || currentAnalyzingRisk ? 'Analysis in Progress...' : 'Share Report'}
+                        {shareUrl ? 'Manage Share' : 'Share Report'}
                       </>
                     )}
                   </Button>
                   
                   {/* Show helpful message when analysis is incomplete */}
-                  {(isGettingRemainingRisks || currentAnalyzingRisk) && (
+                  {(!analysisResult?.analysisComplete && isDisplayedDocumentBeingAnalyzed && (isGettingRemainingRisks || currentAnalyzingRisk)) && (
                     <div className="absolute top-full left-0 mt-1 text-xs text-gray-500 whitespace-nowrap">
                       Share will be available when analysis completes
                     </div>
@@ -2015,6 +2403,25 @@ export default function BeforeSignApp() {
                   </>
                 )}
               </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={deleteShareReport}
+                          disabled={isDeletingShare}
+                          className="border-red-300 text-red-700 hover:bg-red-50"
+                        >
+                          {isDeletingShare ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-600 mr-1"></div>
+                              Deleting...
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Delete Share
+                            </>
+                          )}
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -2032,6 +2439,51 @@ export default function BeforeSignApp() {
                     Your complete analysis has been saved and can be accessed from the history sidebar.
                   </p>
                 </AlertDescription>
+              </Alert>
+            )}
+
+            {/* 🔥 NEW: Background Analysis Status - Only show when different from displayed document */}
+            {false && backgroundAnalysis.isRunning && backgroundAnalysis.documentId !== selectedDocumentId && (
+              <Alert className="mb-6 bg-purple-50 border-purple-200">
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600 mr-2"></div>
+                  <Brain className="h-4 w-4 text-purple-600 mr-2" />
+                  <AlertDescription className="text-purple-800">
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex-1">
+                        <strong>Background Analysis Running</strong>
+                        <div className="text-sm mt-1">
+                          <span className="font-medium">{backgroundAnalysis.fileName}</span> is being analyzed in the background.
+                          {backgroundAnalysis.step === 'category-analysis' && backgroundAnalysis.categoryProgress.currentCategory && (
+                            <span className="ml-2">
+                              Currently: {translateCategory(backgroundAnalysis.categoryProgress.currentCategory)} 
+                              ({backgroundAnalysis.categoryProgress.current}/{backgroundAnalysis.categoryProgress.total})
+                            </span>
+                          )}
+                          {backgroundAnalysis.step === 'deep-analysis' && backgroundAnalysis.deepAnalysisProgress.total > 0 && (
+                            <span className="ml-2">
+                              Deep analysis: {backgroundAnalysis.deepAnalysisProgress.current}/{backgroundAnalysis.deepAnalysisProgress.total} risks
+                            </span>
+                          )}
+                          <br />
+                          <span className="text-purple-600">You can continue viewing other documents while this completes.</span>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (backgroundAnalysis.documentId) {
+                            loadDocument(backgroundAnalysis.documentId)
+                          }
+                        }}
+                        className="border-purple-300 text-purple-700 hover:bg-purple-100 ml-4"
+                      >
+                        View Progress
+                      </Button>
+                    </div>
+                  </AlertDescription>
+                </div>
               </Alert>
             )}
 
@@ -2126,7 +2578,7 @@ export default function BeforeSignApp() {
             </div>
 
             {/* Progress indicator for ongoing analysis */}
-            {isGettingRemainingRisks && (
+            {(isGettingRemainingRisks || (isDisplayedDocumentBeingAnalyzed && backgroundAnalysis.step === 'category-analysis')) && (
               <Alert className="mb-6 bg-blue-50 border-blue-200">
                 <div className="flex items-center">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
@@ -2147,27 +2599,41 @@ export default function BeforeSignApp() {
                           <br />
                           {t('analysis.connectionIssues')}
                         </>
-                      ) : categoryProgress.currentCategory ? (
-                        <>
-                          Currently analyzing {translateCategory(categoryProgress.currentCategory)}
-                          <span className="ml-2 text-blue-600 font-medium">
-                            ({categoryProgress.current}/{categoryProgress.total})
-                          </span>
-                          <br />
-                          <span className="text-blue-600">New risks will appear here automatically</span>
-                        </>
                       ) : (
-                        t('analysis.analyzingRemaining')
+                        (() => {
+                          // Use background progress if this document is being analyzed in background
+                          const currentCategoryProgress = isDisplayedDocumentBeingAnalyzed 
+                            ? backgroundAnalysis.categoryProgress 
+                            : categoryProgress
+                          
+                          return currentCategoryProgress.currentCategory ? (
+                            <>
+                              Currently analyzing {translateCategory(currentCategoryProgress.currentCategory)}
+                              <span className="ml-2 text-blue-600 font-medium">
+                                ({currentCategoryProgress.current}/{currentCategoryProgress.total})
+                              </span>
+                              <br />
+                              <span className="text-blue-600">New risks will appear here automatically</span>
+                            </>
+                          ) : (
+                            t('analysis.analyzingRemaining')
+                          )
+                        })()
                       )}
                     </div>
-                    {categoryProgress.current > 0 && categoryProgress.total > 0 && (
-                      <div className="mt-2">
-                        <Progress 
-                          value={(categoryProgress.current / categoryProgress.total) * 100} 
-                          className="w-full h-2"
-                        />
-                      </div>
-                    )}
+                    {(() => {
+                      const currentCategoryProgress = isDisplayedDocumentBeingAnalyzed 
+                        ? backgroundAnalysis.categoryProgress 
+                        : categoryProgress
+                      return currentCategoryProgress.current > 0 && currentCategoryProgress.total > 0 && (
+                        <div className="mt-2">
+                          <Progress 
+                            value={(currentCategoryProgress.current / currentCategoryProgress.total) * 100} 
+                            className="w-full h-2"
+                          />
+                        </div>
+                      )
+                    })()}
                   </AlertDescription>
                 </div>
               </Alert>

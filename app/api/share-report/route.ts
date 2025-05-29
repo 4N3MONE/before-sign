@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🔄 Share report API called');
+    
     const body = await request.json();
+    console.log('📊 Received body keys:', Object.keys(body));
+    console.log('📊 Analysis result keys:', Object.keys(body.analysisResult || {}));
+    console.log('📊 Risks count:', body.analysisResult?.risks?.length || 0);
     
     // Extract analysis data from request
     const { 
@@ -17,11 +22,18 @@ export async function POST(request: NextRequest) {
 
     // Validate required data
     if (!analysisResult || !analysisResult.risks || !fileName) {
+      console.error('❌ Validation failed:', {
+        hasAnalysisResult: !!analysisResult,
+        hasRisks: !!analysisResult?.risks,
+        hasFileName: !!fileName
+      });
       return NextResponse.json(
         { error: 'Missing required analysis data' },
         { status: 400 }
       );
     }
+
+    console.log('✅ Validation passed, generating share ID...');
 
     // Generate a unique shareable ID
     const shareId = uuidv4();
@@ -56,10 +68,17 @@ export async function POST(request: NextRequest) {
     };
 
     // Save to Firestore
+    console.log('💾 Attempting to save to Firestore...', {
+      shareId,
+      fileName,
+      risksCount: analysisResult.risks.length,
+      hasSelectedParty: !!selectedParty
+    });
+    
     const reportsCollection = collection(db, 'shared-reports');
-    const docRef = await addDoc(reportsCollection, sharedReport);
+    await setDoc(doc(reportsCollection, shareId), sharedReport);
 
-    console.log('Shared report saved with ID:', docRef.id);
+    console.log('✅ Shared report saved with ID:', shareId);
 
     return NextResponse.json({
       success: true,
@@ -69,6 +88,37 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error saving shared report:', error);
+    
+    // More detailed error logging for debugging
+    if (error instanceof Error) {
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      
+      // Check for specific Firebase errors
+      if (error.message.includes('permission')) {
+        return NextResponse.json(
+          { error: 'Database permission denied. Please check Firestore security rules.' },
+          { status: 500 }
+        );
+      } else if (error.message.includes('index')) {
+        return NextResponse.json(
+          { error: 'Database index required. Please create the required Firestore index.' },
+          { status: 500 }
+        );
+      } else if (error.message.includes('network')) {
+        return NextResponse.json(
+          { error: 'Network error. Please check your internet connection.' },
+          { status: 500 }
+        );
+      } else {
+        return NextResponse.json(
+          { error: `Database error: ${error.message}` },
+          { status: 500 }
+        );
+      }
+    }
+    
     return NextResponse.json(
       { error: 'Failed to save shared report' },
       { status: 500 }

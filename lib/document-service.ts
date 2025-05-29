@@ -23,6 +23,11 @@ export interface DocumentAnalysis {
   analysisResult: any // The full analysis result from the risk analysis
   createdAt: Timestamp
   updatedAt: Timestamp
+  shareInfo?: {
+    shareId: string
+    shareUrl: string
+    sharedAt: Timestamp
+  }
 }
 
 export interface DocumentSummary {
@@ -209,17 +214,12 @@ export class DocumentService {
         documentId,
         totalRisks: analysisResult?.totalRisks,
         risksCount: analysisResult?.risks?.length,
-        analysisComplete: analysisResult?.analysisComplete
+        analysisComplete: analysisResult?.analysisComplete,
+        isAnalyzing: analysisResult?.isAnalyzing
       })
       
       // 🔧 CLEAN UNDEFINED VALUES: Firestore doesn't allow undefined values
       const cleanedAnalysisResult = this.removeUndefinedValues(analysisResult)
-      
-      console.log('🧹 Cleaned analysis result for Firestore:', {
-        originalKeys: Object.keys(analysisResult || {}),
-        cleanedKeys: Object.keys(cleanedAnalysisResult || {}),
-        hasUndefinedValues: JSON.stringify(analysisResult).includes('undefined')
-      })
       
       const docRef = doc(db, this.COLLECTION_NAME, documentId)
       await updateDoc(docRef, {
@@ -227,9 +227,51 @@ export class DocumentService {
         updatedAt: serverTimestamp()
       })
       
-      console.log('✅ DocumentService.updateDocumentAnalysis completed successfully')
+      console.log('✅ DocumentService.updateDocumentAnalysis completed successfully for:', documentId)
     } catch (error) {
       console.error('❌ DocumentService.updateDocumentAnalysis failed:', error)
+      throw error
+    }
+  }
+
+  static async updateDocumentShareInfo(documentId: string, shareId: string, shareUrl: string): Promise<void> {
+    try {
+      console.log('🔗 DocumentService.updateDocumentShareInfo called:', {
+        documentId,
+        shareId,
+        shareUrl
+      })
+      
+      const docRef = doc(db, this.COLLECTION_NAME, documentId)
+      await updateDoc(docRef, {
+        shareInfo: {
+          shareId,
+          shareUrl,
+          sharedAt: serverTimestamp()
+        },
+        updatedAt: serverTimestamp()
+      })
+      
+      console.log('✅ DocumentService.updateDocumentShareInfo completed successfully')
+    } catch (error) {
+      console.error('❌ DocumentService.updateDocumentShareInfo failed:', error)
+      throw error
+    }
+  }
+
+  static async removeDocumentShareInfo(documentId: string): Promise<void> {
+    try {
+      console.log('🗑️ DocumentService.removeDocumentShareInfo called for:', documentId)
+      
+      const docRef = doc(db, this.COLLECTION_NAME, documentId)
+      await updateDoc(docRef, {
+        shareInfo: null,
+        updatedAt: serverTimestamp()
+      })
+      
+      console.log('✅ DocumentService.removeDocumentShareInfo completed successfully')
+    } catch (error) {
+      console.error('❌ DocumentService.removeDocumentShareInfo failed:', error)
       throw error
     }
   }

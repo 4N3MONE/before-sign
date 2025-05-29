@@ -313,17 +313,15 @@ export function DocumentSidebar({
                 {documents.map((doc) => (
                   <Card 
                     key={doc.id}
-                    className={`transition-all hover:shadow-md ${
+                    className={`transition-all hover:shadow-md cursor-pointer ${
                       selectedDocumentId === doc.id 
                         ? 'ring-2 ring-blue-500 bg-blue-50' 
                         : doc.isAnalyzing 
-                          ? 'bg-gray-50 cursor-not-allowed opacity-75'
-                          : 'hover:bg-gray-50 cursor-pointer'
+                          ? 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100'
+                          : 'hover:bg-gray-50'
                     }`}
                     onClick={() => {
-                      if (!doc.isAnalyzing) {
-                        onDocumentSelect(doc.id)
-                      }
+                      onDocumentSelect(doc.id)
                     }}
                   >
                     <CardContent className="p-3">
